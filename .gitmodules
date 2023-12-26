@@ -1,0 +1,3 @@
+[submodule "build/nvim-treesitter"]
+	path = build/nvim-treesitter
+	url = git@github.com:nvim-treesitter/nvim-treesitter.git

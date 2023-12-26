@@ -1,0 +1,9 @@
+*
+!.gitignore
+!.gitmodules
+!README.md
+!LICENSE
+
+!example
+!build
+!**/*.odin

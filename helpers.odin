@@ -129,7 +129,7 @@ compat_allocator_proc :: proc(allocator_data: rawptr, mode: mem.Allocator_Mode,
 	}
 }
 
-parser_set_odin_logger :: proc(self: ^Parser, logger: ^runtime.Logger, $level: runtime.Logger_Level) {
+parser_set_odin_logger :: proc(self: Parser, logger: ^runtime.Logger, $level: runtime.Logger_Level) {
 	tree_sitter_log :: proc "c" (payload: rawptr, log_type: Log_Type, buffer: cstring) {
 		context = runtime.default_context()
 		context.logger = (^runtime.Logger)(payload)^

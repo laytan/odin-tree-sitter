@@ -1,4 +1,3 @@
-//+build !windows
 package ts_build
 
 import "core:fmt"
@@ -7,40 +6,95 @@ import "core:os"
 import "core:path/filepath"
 import "core:strings"
 
-_WSTATUS    :: proc(x: i32) -> i32  { return x & 0177 }
-WIFEXITED   :: proc(x: i32) -> bool { return _WSTATUS(x) == 0 }
-WEXITSTATUS :: proc(x: i32) -> i32  { return (x >> 8) & 0x000000ff }
-
 _install :: proc(opts: Install_Opts) -> bool {
-	if opts.clean do rmrf("tmp-tree-sitter")
+	paths   := paths()
+	lib_dir := filepath.join({paths.repo_dir, "tree-sitter"})
+
+	if os.exists(lib_dir) {
+		if (confirm("tree-sitter already exists, reinstall", opts.clean) or_return) {
+			rmrf(lib_dir)
+		} else {
+			return false
+		}
+	}
 
 	exec(fmt.ctprintf("git clone %s --depth=1 --branch=%s tmp-tree-sitter", opts.repo, opts.branch)) or_return
 	defer rmrf("tmp-tree-sitter")
 
-	cflags := strings.builder_make()
-	when ODIN_OS == .Darwin {
-		strings.write_string(&cflags, "-mmacosx-version-min=")
-		strings.write_string(&cflags, opts.minimum_os_version)
-		strings.write_string(&cflags, " ")
+	cc := c_compiler().? or_return
+	ar := archiver().? or_return
+
+	/* cc -I/lib/include -I/lib/src -I/lib/src/wasm -O3 -c lib/src/lib.c */ {
+		cmd: [dynamic]string
+		append(&cmd, cc)
+		
+		include_dir := filepath.join({ "tmp-tree-sitter", "lib", "include" }) 
+		src_dir     := filepath.join({ "tmp-tree-sitter", "lib", "src" })
+		wasm_dir    := filepath.join({ "tmp-tree-sitter", "lib", "src", "wasm" })
+		
+		when ODIN_OS == .Windows {
+			append(&cmd, "/Ox")
+			append(&cmd, "/EHsc")
+			append(&cmd, "/c")
+
+			append(&cmd, fmt.tprintf("/I%s", include_dir))
+			append(&cmd, fmt.tprintf("/I%s", src_dir))
+			append(&cmd, fmt.tprintf("/I%s", wasm_dir))
+
+			if opts.debug {
+				append(&cmd, "/Zi")
+			}
+		} else {
+			append(&cmd, "-O3")
+			append(&cmd, "-c")
+
+			append(&cmd, fmt.tprintf("-I%s", include_dir))
+			append(&cmd, fmt.tprintf("-I%s", src_dir))
+			append(&cmd, fmt.tprintf("-I%s", wasm_dir))
+
+			when ODIN_OS == .Darwin {
+				append(&cmd, fmt.tprintf("-mmacosx-version-min=%s", opts.minimum_os_version))
+			}
+
+			if opts.debug {
+				append(&cmd, "-g")
+			}
+		}
+		append(&cmd, filepath.join({"tmp-tree-sitter", "lib", "src", "lib.c"}))
+
+		ccmd := strings.clone_to_cstring(strings.join(cmd[:], " "))
+		exec(ccmd) or_return
 	}
+	defer rm_file("lib.o")
 
-	if opts.debug {
-		strings.write_string(&cflags, "-g ")
+	/* ar cr libtree-sitter.a lib.o */ {
+		cmd: [dynamic]string
+		append(&cmd, ar)
+
+		when ODIN_OS == .Windows {
+			if opts.debug {
+				append(&cmd, "/DEBUG")
+			}
+
+			append(&cmd, "/OUT:libtree-sitter.lib lib.o")
+		} else {
+			append(&cmd, "cr")
+			append(&cmd, "libtree-sitter.a lib.o")
+		}
+
+		ccmd := strings.clone_to_cstring(strings.join(cmd[:], " "))
+		exec(ccmd) or_return
 	}
-
-	exec(fmt.ctprintf("CFLAGS=%q make -C tmp-tree-sitter libtree-sitter.a", strings.to_string(cflags))) or_return
-
-	paths   := paths()
-	lib_dir := filepath.join({paths.repo_dir, "tree-sitter"})
 	
 	if errno := os.make_directory(lib_dir); errno != 0 && errno != os.EEXIST {
 		log.errorf("could not make directory %q", lib_dir)
 		return false
 	}
 
-	cp_file("tmp-tree-sitter/libtree-sitter.a", filepath.join({lib_dir, "libtree-sitter.a"})) or_return
-	cp_file("tmp-tree-sitter/LICENSE",          filepath.join({lib_dir, "LICENSE"         })) or_return
+	cp_file("libtree-sitter.a", filepath.join({lib_dir, "libtree-sitter.a"}), rm_src=true) or_return
+	cp_file("tmp-tree-sitter/LICENSE", filepath.join({lib_dir, "LICENSE"})) or_return
 
+	log.info("successfully installed tree-sitter")
 	return true
 }
 
@@ -74,6 +128,9 @@ _install_parser :: proc(parser: string, opts: Install_Parser_Opts) -> (ok: bool)
 		}
 	}
 
+	cc := c_compiler().? or_return
+	ar := archiver().? or_return
+
 	exec(fmt.ctprintf("git clone --depth=1 %s %s", parser, pp.tmp_dir)) or_return
 	defer rmrf(pp.tmp_dir)
 
@@ -100,26 +157,60 @@ _install_parser :: proc(parser: string, opts: Install_Parser_Opts) -> (ok: bool)
 		}
 	}
 
-	cflags := strings.builder_make()
-	when ODIN_OS == .Darwin {
-		strings.write_string(&cflags, "-mmacosx-version-min=")
-		strings.write_string(&cflags, opts.minimum_os_version)
-		strings.write_string(&cflags, " ")
-	}
+	/* cc -c -I/src src/scanner.c src/parser.c */ {
+		cmd: [dynamic]string
+		append(&cmd, cc)
 
-	if opts.debug {
-		strings.write_string(&cflags, "-g ")
-	}
+		src_dir := filepath.join({pp.tmp_dir, opts.path, "src"})
 
-	exec(fmt.ctprintf(
-		"cc -O3 -std=c99 %s -I%s -c %s",
-		strings.to_string(cflags),
-		filepath.join({pp.tmp_dir, opts.path, "src"}),
-		strings.join(c_files[:], " ")),
-	) or_return
+		when ODIN_OS == .Windows {
+			append(&cmd, "/O1")
+			append(&cmd, "/EHsc")
+			append(&cmd, "/c")
+			append(&cmd, fmt.tprintf("/I%s", src_dir))
+
+			if opts.debug {
+				append(&cmd, "/Zi")
+			}
+		} else {
+			append(&cmd, "-Os")
+			append(&cmd, fmt.tprintf("-I%s", src_dir))
+			append(&cmd, "-c")
+
+			when ODIN_OS == .Darwin {
+				append(&cmd, fmt.tprintf("-mmacosx-version-min=%s", opts.minimum_os_version))
+			}
+
+			if opts.debug {
+				append(&cmd, "-g")
+			}
+		}
+		append(&cmd, ..c_files[:])
+
+		ccmd := strings.clone_to_cstring(strings.join(cmd[:], " "))
+		exec(ccmd) or_return
+	}
 	defer { for af in ar_files do rm_file(af) }
-	
-	exec(fmt.ctprintf("ar cr %s %s", pp.tmp_parser_path, strings.join(ar_files[:], " "))) or_return
+
+	/* ar cr parser.a parser.o scanner.o */ {
+		cmd: [dynamic]string
+		append(&cmd, ar)
+
+		when ODIN_OS == .Windows {
+			append(&cmd, fmt.tprintf("/OUT:%s", pp.tmp_parser_path))
+
+			if opts.debug {
+				append(&cmd, "/DEBUG")
+			}
+		} else {
+			append(&cmd, "cr")
+			append(&cmd, pp.tmp_parser_path)
+		}
+		append(&cmd, ..ar_files[:])
+
+		ccmd := strings.clone_to_cstring(strings.join(cmd[:], " "))
+		exec(ccmd) or_return
+	}
 
 	if err := os.make_directory(parser_dir); err != 0 {
 		log.errorf("could not make directory %q, error code: %i", parser_dir, err)
@@ -136,7 +227,15 @@ _install_parser :: proc(parser: string, opts: Install_Parser_Opts) -> (ok: bool)
 	}
 
 	cp_file(filepath.join({pp.tmp_dir, "README.md"}), filepath.join({parser_dir, "README.md"}), try_it=true)
-	cp_file(filepath.join({pp.tmp_dir, "parser.a"}),  filepath.join({parser_dir, "parser.a"}))
+
+	when ODIN_OS == .Windows {
+		cp_file(pp.tmp_parser_path, filepath.join({parser_dir, "parser.lib"}))
+		if opts.debug {
+			cp_file(filepath.join({ pp.tmp_dir, "parser.pdb" }), filepath.join({parser_dir, "parser.pdb"}))
+		}
+	} else {
+		cp_file(pp.tmp_parser_path, filepath.join({parser_dir, "parser.a"}))
+	}
 
 	has_queries := cp(filepath.join({pp.tmp_dir, opts.path, "queries"}), filepath.join({parser_dir, "queries"}))
 

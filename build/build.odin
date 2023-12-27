@@ -140,10 +140,14 @@ BINDINGS :: `package ts_{0:s}
 
 import ts "../.."
 
-foreign import ts_{0:s} "parser.a"
+when ODIN_OS == .Windows {{
+	foreign import ts_{0:s} "parser.lib"
+}} else {{
+	foreign import ts_{0:s} "parser.a"
+}}
 
 foreign ts_{0:s} {{
-	tree_sitter_{0:s} :: proc() -> ^ts.Language ---
+	tree_sitter_{0:s} :: proc() -> ts.Language ---
 }}
 
 `
@@ -166,7 +170,12 @@ paths :: proc() -> Paths {
 	repo_dir        := filepath.dir(filepath.dir(#file))
 	parsers_dir     := filepath.join({repo_dir, "parsers"})
 	tmp_dir         := filepath.join({parsers_dir, "tmp"})
-	tmp_parser_path := filepath.join({tmp_dir, "parser.a"})
+
+	when ODIN_OS == .Windows {
+		tmp_parser_path := filepath.join({tmp_dir, "parser.lib"})
+	} else {
+		tmp_parser_path := filepath.join({tmp_dir, "parser.a"})
+	}
 
 	pp := Paths{
 		repo_dir        = repo_dir,

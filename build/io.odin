@@ -5,8 +5,13 @@ import "core:fmt"
 import "core:log"
 import "core:os"
 import "core:path/filepath"
+import "core:strings"
 
 exec :: proc(command: cstring) -> bool {
+	_WSTATUS    :: proc(x: i32) -> i32  { return x & 0177 }
+	WIFEXITED   :: proc(x: i32) -> bool { return _WSTATUS(x) == 0 }
+	WEXITSTATUS :: proc(x: i32) -> i32  { return (x >> 8) & 0x000000ff }
+
 	log.info(command)
 	res := libc.system(command)
 	switch {
@@ -22,6 +27,34 @@ exec :: proc(command: cstring) -> bool {
 		log.error("command %q caused an unknown error", command)
 		return false
 	}
+}
+
+c_compiler :: proc() -> Maybe(string) {
+	if cc, ok := os.lookup_env("CC"); ok do return cc
+	
+	tries := []string{"cc", "cl", "cl.exe", "gcc", "clang"}
+	for try in tries {
+		cmd := "where %s" when ODIN_OS == .Windows else "which %s"
+		exec(fmt.ctprintf(cmd, try)) or_continue
+		return try
+	}
+	
+	log.errorf("no executable c compiler found, tried: %s", strings.join(tries, ", "))
+	return nil
+}
+
+archiver :: proc() -> Maybe(string) {
+	if ar, ok := os.lookup_env("AR"); ok do return ar
+
+	tries := []string{"ar", "lib", "lib.exe"}
+	for try in tries {
+		cmd := "where %s" when ODIN_OS == .Windows else "which %s"
+		exec(fmt.ctprintf(cmd, try)) or_continue
+		return try
+	}
+	
+	log.errorf("no executable archiver found, tried: %s", strings.join(tries, ", "))
+	return nil
 }
 
 // First implemented this using a recursive thingy, but it fucked up over symlinks.

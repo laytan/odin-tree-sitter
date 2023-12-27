@@ -10,13 +10,15 @@ import "core:sync"
 @(private)
 alloc_context: runtime.Context
 
-// Set the allocator used by tree-sitter to one managed by Odin.
-//
-// NOTE: `.Resize` in Odin is used for `realloc`, but Odin's allocators rely on having an `old_size`
-// passed through. Tree Sitter does not give this to us though.
-// The default heap allocator will thus be (probably) the only allocator to work out of the box here.
-// If you get segfaults, you can opt to use the `Compat_Allocator` in this package, it will keep the
-// allocated sizes in a map to pass along, you can imagine this adds some overhead.
+/*
+Set the allocator used by tree-sitter to one managed by Odin.
+
+NOTE: `.Resize` in Odin is used for `realloc`, but Odin's allocators rely on having an `old_size`
+passed through. Tree Sitter does not give this to us though.
+The default heap allocator will thus be (probably) the only allocator to work out of the box here.
+If you get segfaults, you can opt to use the `Compat_Allocator` in this package, it will keep the
+allocated sizes in a map to pass along, you can imagine this adds some overhead.
+*/
 set_odin_allocator :: proc(allocator := context.allocator) {
 	odin_malloc :: proc "c" (size: uint) -> rawptr {
 		context = alloc_context

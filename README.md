@@ -4,6 +4,8 @@ API bindings, wrappers and convenience for [Tree Sitter](https://github.com/tree
 
 A small API example has been written in `example`.
 
+Odin documentation has been published here: [odin-tree-sitter.laytan.dev](https://odin-tree-sitter.laytan.dev/).
+
 ## Build script
 
 In order to make installing tree-sitter and its grammars easier, a build script was written.
@@ -16,8 +18,8 @@ static library and license in the `tree-sitter` subdirectory.
 
 Debug symbols, a different repo or branch and more can be configured using flags and options.
 
-```
-$ odin run build -- install --help
+```sh
+odin run build -- install --help
 Usage:
         build install [flags]
 Flags:
@@ -38,8 +40,8 @@ Bindings are also automatically generated in this directory.
 The bindings will contain one procedure in the format `tree_sitter_LANGUAGE_NAME` and constants that use
 `#load` to load in the query files it provides.
 
-```
-$ odin run build -- install-parser --help
+```sh
+odin run build -- install-parser --help
 Usage:
         build install-parser [git-url]
 Example:

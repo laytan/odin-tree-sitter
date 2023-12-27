@@ -2,7 +2,7 @@ package ts
 
 // This file contains the general bindings.
 
-when ODIN_OS == .Darwin {
+when ODIN_OS != .Windows {
 	foreign import ts "tree-sitter/libtree-sitter.a"
 }
 

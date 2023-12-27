@@ -8,37 +8,51 @@ import "core:path/filepath"
 import "core:strings"
 
 exec :: proc(command: cstring) -> bool {
-	_WSTATUS    :: proc(x: i32) -> i32  { return x & 0177 }
-	WIFEXITED   :: proc(x: i32) -> bool { return _WSTATUS(x) == 0 }
-	WEXITSTATUS :: proc(x: i32) -> i32  { return (x >> 8) & 0x000000ff }
-
 	log.info(command)
 	res := libc.system(command)
-	switch {
-	case res == -1:
-		log.errorf("error spawning command %q", command)
-		return false
-	case WIFEXITED(res) && WEXITSTATUS(res) == 0:
-		return true
-	case WIFEXITED(res):
-		log.errorf("command %q exited with status code %v", command, WEXITSTATUS(res))
-		return false
-	case:
-		log.error("command %q caused an unknown error", command)
-		return false
+
+	when ODIN_OS == .Windows {
+		switch {
+		case res == -1:
+			log.errorf("error spawning command %q", command)
+			return false
+		case res == 0:
+			return true
+		case:
+			log.warnf("command %q exited with non-zero code", command)
+			return false
+		}
+	} else {
+		_WSTATUS    :: proc(x: i32) -> i32  { return x & 0177 }
+		WIFEXITED   :: proc(x: i32) -> bool { return _WSTATUS(x) == 0 }
+		WEXITSTATUS :: proc(x: i32) -> i32  { return (x >> 8) & 0x000000ff }
+
+		switch {
+		case res == -1:
+			log.errorf("error spawning command %q", command)
+			return false
+		case WIFEXITED(res) && WEXITSTATUS(res) == 0:
+			return true
+		case WIFEXITED(res):
+			log.warnf("command %q exited with status code %v", command, WEXITSTATUS(res))
+			return false
+		case:
+			log.errorf("command %q caused an unknown error: %v", command, res)
+			return false
+		}
 	}
 }
 
 c_compiler :: proc() -> Maybe(string) {
 	if cc, ok := os.lookup_env("CC"); ok do return cc
-	
+
 	tries := []string{"cc", "cl", "cl.exe", "gcc", "clang"}
 	for try in tries {
 		cmd := "where %s" when ODIN_OS == .Windows else "which %s"
 		exec(fmt.ctprintf(cmd, try)) or_continue
 		return try
 	}
-	
+
 	log.errorf("no executable c compiler found, tried: %s", strings.join(tries, ", "))
 	return nil
 }
@@ -52,7 +66,7 @@ archiver :: proc() -> Maybe(string) {
 		exec(fmt.ctprintf(cmd, try)) or_continue
 		return try
 	}
-	
+
 	log.errorf("no executable archiver found, tried: %s", strings.join(tries, ", "))
 	return nil
 }
@@ -68,7 +82,7 @@ rmrf :: proc(path: string) -> (ok: bool) {
 
 rm_dir :: proc(path: string) -> bool {
 	log.debugf("rm dir %q", path)
-	
+
 	// Darwin doesn't have remove_directory???
 	when ODIN_OS == .Darwin {
 		ok := os.remove(path)
@@ -83,7 +97,7 @@ rm_dir :: proc(path: string) -> bool {
 
 rm_file :: proc(path: string) -> bool {
 	log.debugf("rm file %q", path)
-	
+
 	// Don't ask me why, but darwin returns bool and others return an error.
 	when ODIN_OS == .Darwin {
 		ok := os.remove(path)
@@ -126,14 +140,14 @@ cp :: proc(src, dst: string, rm_src := false) -> (ok: bool) {
 			log.errorf("could not read directory contents of %q during copy/move, error number: %v", info.fullpath, rerr)
 			return false
 		}
-		
+
 		log.debugf("making dir %q", dst)
 		if err := os.make_directory(dst); err != 0 {
 			log.errorf("making directory %q failed, error number: %v", dst, err)
 			return false
 		}
 		defer { if !ok do rm_dir(dst) }
-		
+
 		fok := true
 		for f in fi {
 			_fok := cp(f.fullpath, filepath.join({dst, filepath.base(f.fullpath)}), rm_src)
@@ -175,7 +189,7 @@ cp_file :: proc(src, dst: string, try_it := false, rm_src := false) -> (ok: bool
 	defer delete(src_data)
 
 	write_entire_file(dst, src_data) or_return
-	
+
 	return true
 }
 

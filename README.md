@@ -11,6 +11,10 @@ Odin documentation has been published here: [odin-tree-sitter.laytan.dev](https:
 In order to make installing tree-sitter and its grammars easier, a build script was written.
 With it tree-sitter itself can be installed, and more importantly the grammars can be installed and have bindings generated.
 
+NOTE: On Windows, you must run this script through the Developer Command Prompt bundled with Visual Studio.
+
+You can change the c compiler or archiver by setting the `CC` and `AR` environment variables.
+
 ### Installing tree-sitter
 
 Command installs tree-sitter itself by downloading the git repository, compiling it, and putting the

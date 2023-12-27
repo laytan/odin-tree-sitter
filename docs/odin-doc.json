@@ -1,0 +1,19 @@
+{
+    "hide_core": true,
+    "collections": {
+        "tree-sitter": {
+            "name": "tree-sitter",
+            "source_url": "https://github.com/laytan/odin-tree-sitter/blob/main",
+            "base_url": "/tree-sitter",
+            "root_path": "../..",
+            "license": {
+                "text": "MIT",
+                "url": "https://github.com/laytan/odin-tree-sitter/tree/main/LICENSE"
+            },
+            "home": {
+                "title": "Tree Sitter",
+                "embed_readme": "../../README.md"
+            }
+        }
+    }
+}

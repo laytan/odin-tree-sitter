@@ -4,6 +4,13 @@
 !README.md
 !LICENSE
 
+!.github
+!.github/**/*
+
+!docs
+!docs/generate.sh
+!docs/odin-doc.json
+
 !example
 !build
 !**/*.odin

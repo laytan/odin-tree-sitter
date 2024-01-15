@@ -12,7 +12,6 @@ import "core:log"
 import "core:mem"
 
 main :: proc() {
-	
 	logger := log.create_console_logger(.Debug, {
 		.Level,
 		.Terminal_Color,
@@ -51,7 +50,7 @@ main :: proc() {
 		fmt.assertf(read_ok, "reading current file at %q failed", #file)
 		defer delete(data)
 		source := string(data)
-		
+
 		tree := ts.parser_parse_string(parser, source)
 		assert(tree != nil)
 		defer ts.tree_delete(tree)

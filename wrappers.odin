@@ -7,22 +7,22 @@ import "core:time"
 import "core:os"
 
 // set the ranges of text that the parser should include when parsing.
-// 
+//
 // by default, the parser will always include entire documents. this function
 // allows you to parse only a *portion* of a document but still return a syntax
 // tree whose ranges match up with the document as a whole. you can also pass
 // multiple disjoint ranges.
-// 
+//
 // the second parameter specifies the slice of ranges.
 // the parser does *not* take ownership of these ranges; it copies the data,
 // so it doesn't matter how these ranges are allocated.
-// 
+//
 // if `len(ranges)` is zero, then the entire document will be parsed. otherwise,
 // the given ranges must be ordered from earliest to latest in the document,
 // and they must not overlap. that is, the following must hold for all:
-// 
+//
 // `i < len(ranges) - 1`: `ranges[i].end_byte <= ranges[i + 1].start_byte`
-// 
+//
 // if this requirement is not satisfied, the operation will fail, the ranges
 // will not be assigned, and this function will return `false`. on success,
 // this function returns `true`
@@ -53,7 +53,7 @@ parser_parse_string_encoding :: #force_inline proc(self: Parser, string: string,
 }
 
 // Set the maximum duration that parsing should be allowed to take before halting.
-// 
+//
 // If parsing takes longer than this, it will halt early, returning NULL.
 // See [`parser_parse`] for more information.
 parser_set_timeout :: #force_inline proc(self: Parser, timeout: time.Duration) {
@@ -75,7 +75,7 @@ parser_print_dot_graphs :: #force_inline proc(self: Parser, fd: os.Handle) {
 }
 
 // Get the array of included ranges that was used to parse the syntax tree.
-// 
+//
 // NOTE: The returned slice must be freed by the caller.
 tree_included_ranges :: #force_inline proc(self: Tree) -> []Range {
 	length: u32 = ---
@@ -85,13 +85,13 @@ tree_included_ranges :: #force_inline proc(self: Tree) -> []Range {
 
 // Compare an old edited syntax tree to a new syntax tree representing the same
 // document, returning a slice of ranges whose syntactic structure has changed.
-// 
+//
 // For this to work correctly, the old syntax tree must have been edited such
 // that its ranges match up to the new tree. Generally, you'll want to call
 // this function right after calling one of the [`parser_parse`] functions.
 // You need to pass the old tree that was passed to parse, as well as the new
 // tree that was returned from that function.
-// 
+//
 // NOTE: The returned array is allocated using the provided `malloc` and the caller is responsible
 // for freeing.
 tree_get_changed_ranges :: #force_inline proc(old_tree: Tree, new_tree: Tree) -> []Range {
@@ -135,7 +135,7 @@ tree_cursor_goto_first_child_for :: proc {
 // Create a new query from a string containing one or more S-expression
 // patterns. The query is associated with a particular language, and can
 // only be run on syntax nodes parsed with that language.
-// 
+//
 // If all of the given patterns are valid, this returns a [`TSQuery`].
 // If a pattern is invalid, this returns `NULL`, and provides two pieces
 // of information about the problem:
@@ -147,7 +147,7 @@ query_new :: #force_inline proc(language: Language, source: string) -> (query: Q
 }
 
 // Get all of the predicates for the given pattern in the query.
-// 
+//
 // The predicates are represented as a single slice of steps. There are three
 // types of steps in this slice, which correspond to the three legal values for
 // the `type` field:
@@ -161,7 +161,7 @@ query_new :: #force_inline proc(language: Language, source: string) -> (query: Q
 //    If a pattern has two predicates, then there will be two with this `type` in the slice.
 query_predicates_for_pattern :: #force_inline proc(self: Query, pattern_index: u32) -> []Query_Predicate_Step {
 	length: u32 = ---
-	multi := _query_predicates_for_pattern(self, pattern_index, &length) 
+	multi := _query_predicates_for_pattern(self, pattern_index, &length)
 	return multi[:length]
 }
 
@@ -181,7 +181,7 @@ query_string_value_for_id :: #force_inline proc(self: Query, index: u32) -> stri
 }
 
 // Disable a certain capture within a query.
-// 
+//
 // This prevents the capture from being returned in matches, and also avoids
 // any resource usage associated with recording the capture. Currently, there
 // is no way to undo this.

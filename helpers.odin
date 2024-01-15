@@ -5,7 +5,6 @@ package ts
 import "core:mem"
 import "core:runtime"
 import "core:fmt"
-import "core:sync"
 
 @(private)
 alloc_context: runtime.Context
@@ -17,12 +16,12 @@ NOTE: `.Resize` in Odin is used for `realloc`, but Odin's allocators rely on hav
 passed through. Tree Sitter does not give this to us though.
 The default heap allocator will thus be (probably) the only allocator to work out of the box here.
 If you get segfaults, you can opt to use the `Compat_Allocator` in this package, it will keep the
-allocated sizes in a map to pass along, you can imagine this adds some overhead.
+allocated sizes in an 8 byte header before each allocation, and passes this along to the actual allocator.
 */
 set_odin_allocator :: proc(allocator := context.allocator) {
 	odin_malloc :: proc "c" (size: uint) -> rawptr {
 		context = alloc_context
-		addr, err := runtime.mem_alloc_non_zeroed(int(size))
+		addr, err := runtime.mem_alloc_non_zeroed(int(size), 16)
 		if err != nil {
 			fmt.panicf("tree-sitter malloc could not be satisfied: %v", err)
 		}
@@ -31,7 +30,7 @@ set_odin_allocator :: proc(allocator := context.allocator) {
 
 	odin_calloc :: proc "c" (num: uint, size: uint) -> rawptr {
 		context = alloc_context
-		addr, err := runtime.mem_alloc(int(num)*int(size))
+		addr, err := runtime.mem_alloc(int(num)*int(size), 16)
 		if err != nil {
 			fmt.panicf("tree-sitter calloc could not be satisfied: %v", err)
 		}
@@ -43,7 +42,7 @@ set_odin_allocator :: proc(allocator := context.allocator) {
 		// `old_size` of `max(int)` prohibits the default allocator from zeroing the region.
 		// Other allocators can be wrapped by the `Compat_Allocator` in this package to keep track
 		// of allocation sizes to pass along.
-		addr, err := runtime.mem_resize(ptr, max(int), int(size))
+		addr, err := runtime.mem_resize(ptr, max(int), int(size), 16)
 		if err != nil {
 			fmt.panicf("tree-sitter realloc could not be satisfied: %v", err)
 		}
@@ -61,15 +60,21 @@ set_odin_allocator :: proc(allocator := context.allocator) {
 }
 
 // An allocator that keeps track of allocation sizes and passes it along to resizes.
+// This is needed because tree-sitter does not pass old size of allocations on reallocs.
+//
+// You want to wrap your allocator into this one if you are trying to use any allocator that relies
+// on the old size to work.
+// This is most allocators, although the default heap allocator seems to work normally without this
+// wrapping allocator.
+//
+// The overhead of this allocator is an extra 8 bytes allocated for each allocation, these bytes are
+// used as an i64 to store the allocation size.
 Compat_Allocator :: struct {
-	sizes:  map[rawptr]int,
 	parent: mem.Allocator,
-	mu:     sync.Mutex,
 }
 
-compat_allocator_init :: proc(rra: ^Compat_Allocator, allocator := context.allocator, sizes_allocator := context.allocator) {
+compat_allocator_init :: proc(rra: ^Compat_Allocator, allocator := context.allocator) {
 	rra.parent = allocator
-	rra.sizes  = make(map[rawptr]int, allocator=sizes_allocator)
 }
 
 compat_allocator :: proc(rra: ^Compat_Allocator) -> mem.Allocator {
@@ -79,57 +84,71 @@ compat_allocator :: proc(rra: ^Compat_Allocator) -> mem.Allocator {
 	}
 }
 
-compat_allocator_destroy :: proc(rra: ^Compat_Allocator) {
-	delete(rra.sizes)
-}
-
 @(private)
 compat_allocator_proc :: proc(allocator_data: rawptr, mode: mem.Allocator_Mode,
                              size, alignment: int,
                              old_memory: rawptr, old_size: int,
                              location := #caller_location) -> (data: []byte, err: mem.Allocator_Error) {
+	Header :: struct {
+		size: i64,
+	}
+
 	rra := (^Compat_Allocator)(allocator_data)
-	#partial switch mode {
+	switch mode {
 	case .Alloc, .Alloc_Non_Zeroed:
-		data, err = rra.parent.procedure(rra.parent.data, mode, size, alignment, old_memory, old_size, location)
-		if err == nil {
-			sync.guard(&rra.mu)
-			rra.sizes[raw_data(data)] = size
-		}
+		assert(alignment == 16)
+		alignment := 8
+
+		size := size
+		size += size_of(Header)
+
+		data = rra.parent.procedure(rra.parent.data, mode, size, alignment, old_memory, old_size, location) or_return
+
+		header := cast(^Header)(raw_data(data))
+		header.size = i64(size)
+
+		data = data[size_of(Header):]
 		return
 
 	case .Free:
-		{
-			sync.guard(&rra.mu)
-			delete_key(&rra.sizes, old_memory)
-		}
+		header := cast(^Header)(uintptr(old_memory)-size_of(Header))
+
+		old_size   := int(header.size)
+		old_memory := header
+
 		return rra.parent.procedure(rra.parent.data, mode, size, alignment, old_memory, old_size, location)
 
 	case .Resize:
-		stored_old_size: int; {
-			sync.guard(&rra.mu)
+		assert(alignment == 16)
+		alignment := 8
 
-			if stored, has_stored := rra.sizes[old_memory]; has_stored {
-				stored_old_size = stored
-				delete_key(&rra.sizes, old_memory)
-			} else {
-				stored_old_size = old_size
-			}
-		}
+		header := cast(^Header)(uintptr(old_memory)-size_of(Header))
 
-		data, err = rra.parent.procedure(rra.parent.data, mode, size, alignment, old_memory, stored_old_size, location)
-		if err == nil {
-			sync.guard(&rra.mu)
-			rra.sizes[raw_data(data)] = size
-		}
+		size       := size + size_of(Header)
+		old_size   := int(header.size)
+		old_memory := header
+
+		data = rra.parent.procedure(rra.parent.data, mode, size, alignment, old_memory, old_size, location) or_return
+
+		header = cast(^Header)(raw_data(data))
+		header.size = i64(size)
+
+		data = data[size_of(Header):]
 		return
 
-	case:
+	case .Free_All, .Query_Info, .Query_Features:
 		return rra.parent.procedure(rra.parent.data, mode, size, alignment, old_memory, old_size, location)
+
+	case: unreachable()
 	}
 }
 
 parser_set_odin_logger :: proc(self: Parser, logger: ^runtime.Logger, $level: runtime.Logger_Level) {
+	if logger == nil {
+		parser_set_logger(self, Logger{})
+		return
+	}
+
 	tree_sitter_log :: proc "c" (payload: rawptr, log_type: Log_Type, buffer: cstring) {
 		context = runtime.default_context()
 		context.logger = (^runtime.Logger)(payload)^

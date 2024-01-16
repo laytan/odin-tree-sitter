@@ -16,12 +16,12 @@ NOTE: `.Resize` in Odin is used for `realloc`, but Odin's allocators rely on hav
 passed through. Tree Sitter does not give this to us though.
 The default heap allocator will thus be (probably) the only allocator to work out of the box here.
 If you get segfaults, you can opt to use the `Compat_Allocator` in this package, it will keep the
-allocated sizes in an 8 byte header before each allocation, and passes this along to the actual allocator.
+allocated sizes in a 2*size_of(rawptr) byte header before each allocation, and passes this along to the actual allocator.
 */
 set_odin_allocator :: proc(allocator := context.allocator) {
 	odin_malloc :: proc "c" (size: uint) -> rawptr {
 		context = alloc_context
-		addr, err := runtime.mem_alloc_non_zeroed(int(size), 16)
+		addr, err := runtime.mem_alloc_non_zeroed(int(size))
 		if err != nil {
 			fmt.panicf("tree-sitter malloc could not be satisfied: %v", err)
 		}
@@ -30,7 +30,7 @@ set_odin_allocator :: proc(allocator := context.allocator) {
 
 	odin_calloc :: proc "c" (num: uint, size: uint) -> rawptr {
 		context = alloc_context
-		addr, err := runtime.mem_alloc(int(num)*int(size), 16)
+		addr, err := runtime.mem_alloc(int(num)*int(size))
 		if err != nil {
 			fmt.panicf("tree-sitter calloc could not be satisfied: %v", err)
 		}
@@ -42,7 +42,7 @@ set_odin_allocator :: proc(allocator := context.allocator) {
 		// `old_size` of `max(int)` prohibits the default allocator from zeroing the region.
 		// Other allocators can be wrapped by the `Compat_Allocator` in this package to keep track
 		// of allocation sizes to pass along.
-		addr, err := runtime.mem_resize(ptr, max(int), int(size), 16)
+		addr, err := runtime.mem_resize(ptr, max(int), int(size))
 		if err != nil {
 			fmt.panicf("tree-sitter realloc could not be satisfied: %v", err)
 		}
@@ -67,8 +67,8 @@ set_odin_allocator :: proc(allocator := context.allocator) {
 // This is most allocators, although the default heap allocator seems to work normally without this
 // wrapping allocator.
 //
-// The overhead of this allocator is an extra 8 bytes allocated for each allocation, these bytes are
-// used as an i64 to store the allocation size.
+// The overhead of this allocator is an extra 2*size_of(rawptr) bytes allocated for each allocation, these bytes are
+// used to store the size and padding to keep the returned alignment to 2*size_of(rawptr) bytes.
 Compat_Allocator :: struct {
 	parent: mem.Allocator,
 }
@@ -90,22 +90,20 @@ compat_allocator_proc :: proc(allocator_data: rawptr, mode: mem.Allocator_Mode,
                              old_memory: rawptr, old_size: int,
                              location := #caller_location) -> (data: []byte, err: mem.Allocator_Error) {
 	Header :: struct {
-		size: i64,
+		_padding: [size_of(rawptr)]byte, // We want the structure to be 2*size of ptr bytes so the allocation we return is also aligned to 16 bytes.
+		size:     uintptr,
 	}
 
 	rra := (^Compat_Allocator)(allocator_data)
 	switch mode {
 	case .Alloc, .Alloc_Non_Zeroed:
-		assert(alignment == 16)
-		alignment := 8
-
 		size := size
 		size += size_of(Header)
 
 		data = rra.parent.procedure(rra.parent.data, mode, size, alignment, old_memory, old_size, location) or_return
 
 		header := cast(^Header)(raw_data(data))
-		header.size = i64(size)
+		header.size = uintptr(size)
 
 		data = data[size_of(Header):]
 		return
@@ -119,9 +117,6 @@ compat_allocator_proc :: proc(allocator_data: rawptr, mode: mem.Allocator_Mode,
 		return rra.parent.procedure(rra.parent.data, mode, size, alignment, old_memory, old_size, location)
 
 	case .Resize:
-		assert(alignment == 16)
-		alignment := 8
-
 		header := cast(^Header)(uintptr(old_memory)-size_of(Header))
 
 		size       := size + size_of(Header)
@@ -131,7 +126,7 @@ compat_allocator_proc :: proc(allocator_data: rawptr, mode: mem.Allocator_Mode,
 		data = rra.parent.procedure(rra.parent.data, mode, size, alignment, old_memory, old_size, location) or_return
 
 		header = cast(^Header)(raw_data(data))
-		header.size = i64(size)
+		header.size = uintptr(size)
 
 		data = data[size_of(Header):]
 		return

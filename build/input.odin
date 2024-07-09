@@ -25,7 +25,7 @@ ask_for_line :: proc(prompt: string) -> (string, bool) {
 		}
 	}
 
-	name := strings.trim_space(string(buf[:n]))
+	name := strings.clone(strings.trim_space(string(buf[:n])))
 	return name, len(name) > 0
 }
 

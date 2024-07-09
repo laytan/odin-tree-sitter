@@ -85,9 +85,9 @@ rm_dir :: proc(path: string) -> bool {
 
 	// Darwin doesn't have remove_directory???
 	when ODIN_OS == .Darwin {
-		ok := os.remove(path)
-		if !ok { log.errorf("could not remove directory %q", path) }
-		return ok
+		err := os.remove(path)
+		if err != 0 { log.errorf("could not remove directory %q, error number: %v", path, err) }
+		return err == 0
 	} else {
 		err := os.remove_directory(path)
 		if err != 0 { log.errorf("could not remove directory %q, error number: %v", path, err) }
@@ -100,9 +100,9 @@ rm_file :: proc(path: string) -> bool {
 
 	// Don't ask me why, but darwin returns bool and others return an error.
 	when ODIN_OS == .Darwin {
-		ok := os.remove(path)
-		if !ok { log.errorf("could not remove file %q", path) }
-		return ok
+		err := os.remove(path)
+		if err != 0 { log.errorf("could not remove file %q, error number: %v", path, err) }
+		return err == 0
 	} else {
 		err := os.remove(path)
 		if err != 0 { log.errorf("could not remove file %q, error number: %v", path, err) }
@@ -142,8 +142,8 @@ cp :: proc(src, dst: string, rm_src := false) -> (ok: bool) {
 		}
 
 		log.debugf("making dir %q", dst)
-		if err := os.make_directory(dst); err != 0 {
-			log.errorf("making directory %q failed, error number: %v", dst, err)
+		if errno := os.make_directory(dst); errno != 0 {
+			log.errorf("making directory %q failed, error number: %v", dst, errno)
 			return false
 		}
 		defer { if !ok do rm_dir(dst) }

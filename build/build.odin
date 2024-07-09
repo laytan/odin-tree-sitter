@@ -1,9 +1,11 @@
 package ts_build
 
+import "core:flags"
 import "core:fmt"
 import "core:log"
 import "core:os"
 import "core:path/filepath"
+import "core:slice"
 import "core:strings"
 
 print_usage :: proc(fd: os.Handle) {
@@ -21,33 +23,10 @@ For further details on a command, invoke the command with the -help flag:
 `, PROGRAM)
 }
 
-HELP_INSTALL :: `Usage:
-	{0:s} install [flags]
-Flags:
-	-help,-h               Show this message.
-	-debug,-d              Compile tree-sitter with debug symbols.
-	-minimum-os-version,-m The minimum OS version to target (only used on Darwin, default is 12.0.0).
-	-branch,-b             Branch of the tree-sitter git repo to install, default is "master".
-	-repo,-r               Repo to install, default is "https://github.com/tree-sitter/tree-sitter".
-	-clean,-c              First uninstall.
-`
-
-HELP_INSTALL_PARSER :: `Usage:
-	{0:s} install-parser [git-url]
-Example:
-	{0:s} install-parser https://github.com/amaanq/tree-sitter-odin
-Flags:
-	-help,-h               Show this message.
-	-debug,-d              Compile parser with debug symbols.
-	-minimum-os-version,-m The minimum OS version to target (only used on Darwin, default is 12.0.0).
-	-yes,-y                Automatically confirm questions to their defaults (non-interactive) mode.
-	-name,-n               Overwrite the language name.
-	-clean,-c              First uninstall.
-	-path,-p               Subdirectory to compile.
-`
-
 main :: proc() {
 	context.logger = log.create_console_logger(.Info, {.Level, .Terminal_Color})
+
+	args := slice.clone_to_dynamic(os.args)
 
 	if len(os.args) < 2 {
 		print_usage(os.stderr)	
@@ -59,10 +38,16 @@ main :: proc() {
 		print_usage(os.stdout)
 		return
 	case "install":
-		ok := install(os.args[2:])
+		args[0] = strings.join({args[0], args[1]}, " ")
+		ordered_remove(&args, 1)
+
+		ok := install(args[:])
 		os.exit(0 if ok else 1)
 	case "install-parser":
-		ok := install_parser(os.args[2:])
+		args[0] = strings.join({args[0], args[1]}, " ")
+		ordered_remove(&args, 1)
+
+		ok := install_parser(args[:])
 		os.exit(0 if ok else 1)
 	case:
 		log.errorf("unknown command %q", os.args[1])
@@ -72,12 +57,11 @@ main :: proc() {
 }
 
 Install_Opts :: struct {
-	help:               bool,
-	debug:              bool,
-	minimum_os_version: string,
-	branch:             string,
-	repo:               string,
-	clean:              bool,
+	debug:              bool   `usage:"Compile tree-sitter with debug symbols."`,
+	minimum_os_version: string `usage:"The minimum OS version to target (only used on Darwin, default is 12.0.0)."`,
+	branch:             string `usage:"Branch of the tree-sitter git repo to install, default is "master".`,
+	repo:               string `usage:"Repo to install, default is "https://github.com/tree-sitter/tree-sitter".`,
+	clean:              bool   `usage:"First uninstall."`,
 }
 
 install :: proc(args: []string) -> bool {
@@ -86,52 +70,28 @@ install :: proc(args: []string) -> bool {
 		repo               = "https://github.com/tree-sitter/tree-sitter",
 		minimum_os_version = "12.0.0",
 	}
-	unused := args_consume(&iopts, args) or_return
-
-	if iopts.help {
-		fmt.printf(HELP_INSTALL, PROGRAM)
-		os.exit(0)
-	}
-
-	if len(unused) > 0 {
-		log.warnf("unused input %q", strings.join(unused, " "))
-	}
+	flags.parse_or_exit(&iopts, args)
 
 	return _install(iopts)
 }
 
 Install_Parser_Opts :: struct {
-	help:               bool,
-	debug:              bool,
-	minimum_os_version: string,
-	yes:                bool,
-	name:               string,
-	clean:              bool,
-	path:               string,
+	parser:             string `args:"required,pos=0" usage:"git URL of the parser to be installed."`,
+	debug:              bool   `usage:"Compile parser with debug symbols."`,
+	minimum_os_version: string `usage:"The minimum OS version to target (only used on Darwin, default is 12.0.0)."`,
+	yes:                bool   `usage:"Automatically confirm questions to their defaults (non-interactive) mode."`,
+	name:               string `usage:"Overwrite the language name."`,
+	clean:              bool   `usage:"First uninstall."`,
+	path:               string `usage:"Subdirectory to compile."`,
 }
 
 install_parser :: proc(args: []string) -> bool {
 	iopts := Install_Parser_Opts{
 		minimum_os_version = "12.0.0",
 	}
-	unused := args_consume(&iopts, args) or_return
+	flags.parse_or_exit(&iopts, args)
 
-	if iopts.help {
-		fmt.printf(HELP_INSTALL_PARSER, PROGRAM)
-		os.exit(0)
-	}
-
-	if len(unused) > 0 {
-		parser := unused[0]
-		unused = unused[1:]
-		if len(unused) > 0 {
-			log.warnf("unused input %q", strings.join(unused, " "))
-		}
-		return _install_parser(parser, iopts)
-	}
-
-	log.error("missing git link to parser, please provide it e.g. `build install-parser https://github.com/amaanq/tree-sitter-odin`")
-	return false
+	return _install_parser(iopts)
 }
 
 PROGRAM :: "build"

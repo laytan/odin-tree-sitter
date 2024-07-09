@@ -4,7 +4,6 @@ import "core:fmt"
 import "core:log"
 import "core:os"
 import "core:path/filepath"
-import "core:path/slashpath"
 import "core:strings"
 
 _install :: proc(opts: Install_Opts) -> bool {
@@ -25,7 +24,8 @@ _install :: proc(opts: Install_Opts) -> bool {
 	cc := c_compiler().? or_return
 	ar := archiver().? or_return
 
-	/* cc -I/lib/include -I/lib/src -I/lib/src/wasm -O3 -c lib/src/lib.c */ {
+	/* cc -I/lib/include -I/lib/src -I/lib/src/wasm -O3 -c lib/src/lib.c */
+	{
 		cmd: [dynamic]string
 		append(&cmd, cc)
 
@@ -68,7 +68,8 @@ _install :: proc(opts: Install_Opts) -> bool {
 	}
 	defer rm_file("lib.obj" when ODIN_OS == .Windows else "lib.o")
 
-	/* ar cr libtree-sitter.a lib.o */ {
+	/* ar cr libtree-sitter.a lib.o */
+	{
 		cmd: [dynamic]string
 		append(&cmd, ar)
 
@@ -101,8 +102,8 @@ _install :: proc(opts: Install_Opts) -> bool {
 	return true
 }
 
-_install_parser :: proc(parser: string, opts: Install_Parser_Opts) -> (ok: bool) {
-	parser := parser
+_install_parser :: proc(opts: Install_Parser_Opts) -> (ok: bool) {
+	parser := opts.parser
 
 	name := opts.name
 	if name == "" {
@@ -168,7 +169,8 @@ _install_parser :: proc(parser: string, opts: Install_Parser_Opts) -> (ok: bool)
 		}
 	}
 
-	/* cc -c -I/src src/scanner.c src/parser.c */ {
+	/* cc -c -I/src src/scanner.c src/parser.c */
+	{
 		cmd: [dynamic]string
 		append(&cmd, cc)
 
@@ -203,7 +205,8 @@ _install_parser :: proc(parser: string, opts: Install_Parser_Opts) -> (ok: bool)
 	}
 	defer { for af in ar_files do rm_file(af) }
 
-	/* ar cr parser.a parser.o scanner.o */ {
+	/* ar cr parser.a parser.o scanner.o */
+	{
 		cmd: [dynamic]string
 		append(&cmd, ar)
 

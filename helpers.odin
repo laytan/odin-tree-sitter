@@ -2,9 +2,12 @@ package ts
 
 // This file adds helpers and convenience procedures.
 
-import "core:mem"
-import "core:runtime"
+import "base:runtime"
+
 import "core:fmt"
+import "core:log"
+import "core:mem"
+import "core:os"
 
 @(private)
 alloc_context: runtime.Context
@@ -89,6 +92,8 @@ compat_allocator_proc :: proc(allocator_data: rawptr, mode: mem.Allocator_Mode,
                              size, alignment: int,
                              old_memory: rawptr, old_size: int,
                              location := #caller_location) -> (data: []byte, err: mem.Allocator_Error) {
+	size, old_size := size, old_size
+
 	Header :: struct {
 		_padding: [size_of(rawptr)]byte, // We want the structure to be 2*size of ptr bytes so the allocation we return is also aligned to 16 bytes.
 		size:     uintptr,
@@ -111,16 +116,16 @@ compat_allocator_proc :: proc(allocator_data: rawptr, mode: mem.Allocator_Mode,
 	case .Free:
 		header := cast(^Header)(uintptr(old_memory)-size_of(Header))
 
-		old_size   := int(header.size)
+		old_size    = int(header.size)
 		old_memory := header
 
 		return rra.parent.procedure(rra.parent.data, mode, size, alignment, old_memory, old_size, location)
 
-	case .Resize:
+	case .Resize, .Resize_Non_Zeroed:
 		header := cast(^Header)(uintptr(old_memory)-size_of(Header))
 
-		size       := size + size_of(Header)
-		old_size   := int(header.size)
+		size        = size + size_of(Header)
+		old_size    = int(header.size)
 		old_memory := header
 
 		data = rra.parent.procedure(rra.parent.data, mode, size, alignment, old_memory, old_size, location) or_return
@@ -138,6 +143,9 @@ compat_allocator_proc :: proc(allocator_data: rawptr, mode: mem.Allocator_Mode,
 	}
 }
 
+// NOTE: even though there is nothing printed when the log level is higher, tree-sitter still formats
+// all the log messages, this has huge overhead so you should probably only set this if you actually
+// have the log level of it.
 parser_set_odin_logger :: proc(self: Parser, logger: ^runtime.Logger, $level: runtime.Logger_Level) {
 	if logger == nil {
 		parser_set_logger(self, Logger{})
@@ -168,4 +176,52 @@ parser_set_odin_logger :: proc(self: Parser, logger: ^runtime.Logger, $level: ru
 
 node_text :: proc(self: Node, source: string) -> string {
 	return source[node_start_byte(self):node_end_byte(self)]
+}
+
+// Iterates over the predicates by subslicing them split by the .Done type.
+predicates_iter :: proc(preds: ^[]Query_Predicate_Step) -> ([]Query_Predicate_Step, bool) {
+	if len(preds) == 0 {
+		return nil, false
+	}
+
+	n := 0
+	for pred in preds {
+		if pred.type == .Done {
+			break
+		}
+		n += 1
+	}
+
+	pred := preds[:n]
+	preds^ = preds[n+1:]
+	return pred, true
+}
+
+File_Input :: struct {
+	fh:  os.Handle,
+	buf: []byte,
+	ctx: runtime.Context,
+}
+
+file_input :: proc(fi: ^File_Input, fh: os.Handle, buf: []byte, encoding: Input_Encoding = .UTF8) -> Input {
+	fi.fh = fh
+	fi.buf = buf
+	fi.ctx = context
+	return Input{
+		payload  = fi,
+		read     = proc "c" (payload: rawptr, off: u32, _: Point, read: ^u32) -> cstring {
+			fi := (^File_Input)(payload)
+			context = fi.ctx
+
+			n, err := os.read_at(fi.fh, fi.buf, i64(off))
+			if err != 0 {
+				log.warnf("read error: %v", err)
+			}
+
+			read^ = u32(n)
+			fi.buf[n] = 0
+			return cstring(raw_data(fi.buf))
+		},
+		encoding = encoding,
+	}
 }

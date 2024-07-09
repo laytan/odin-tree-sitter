@@ -24,18 +24,20 @@ jobs:
       url: ${{ steps.deployment.outputs.page_url }}
     runs-on: ubuntu-latest
     steps:
-      - uses: laytan/setup-odin@v1
+      - uses: laytan/setup-odin@v2
+        with:
+            token: ${{ secrets.GITHUB_TOKEN }}
       - name: Get commonmark
         run: sudo apt-fast install libcmark-dev
       - name: Get and build Odin docs generator
         run: |
           cd /home/runner
-          git clone https://github.com/laytan/pkg.odin-lang.org --branch=configurable-for-third-party odin-doc
+          git clone https://github.com/odin-lang/pkg.odin-lang.org odin-doc
           cd odin-doc
           # The /home/runner/odin directory is in the PATH so output it there.
           odin build . -out:/home/runner/odin/odin-doc
           cd /home/runner
-      - uses: actions/checkout@v1
+      - uses: actions/checkout@v4
       - name: Generate documentation
         run: ./docs/generate.sh
       - uses: actions/configure-pages@v3

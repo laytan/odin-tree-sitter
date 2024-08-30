@@ -86,7 +86,7 @@ Node :: struct {
 Tree_Cursor :: struct {
 	tree: rawptr,
 	id:   rawptr,
-	ctx:  [2]u32,
+	ctx:  [3]u32,
 }
 
 Query_Capture :: struct {
@@ -414,7 +414,12 @@ foreign ts {
 	node_next_parse_state :: proc(self: Node) -> State_Id ---
 
 	// Get the node's immediate parent.
+	// Prefer [`ts_node_child_containing_descendant`] for
+	// iterating over the node's ancestors.
 	node_parent :: proc(self: Node) -> Node ---
+
+	// Get the node's child that contains `descendant`.
+	node_child_containing_descendant :: proc(self: Node, descendant: Node) -> Node ---
 
 	// Get the node's child at the given index, where zero represents the first child.
 	node_child :: proc(self: Node, child_index: u32) -> Node ---
@@ -505,7 +510,8 @@ foreign ts {
 	// Delete a tree cursor, freeing all of the memory that it used.
 	tree_cursor_delete :: proc(self: ^Tree_Cursor) ---
 
-	// Re-initialize a tree cursor to start at a different node.
+	// Re-initialize a tree cursor to start at the original node that the cursor was
+	// constructed with.
 	tree_cursor_reset :: proc(self: ^Tree_Cursor, node: Node) ---
 
 	// Re-initialize a tree cursor to the same position as another cursor.
@@ -631,6 +637,12 @@ foreign ts {
 	// This can be useful when combining queries by concatenating their source
 	// code strings.
 	query_start_byte_for_pattern :: proc(self: Query, pattern_index: u32) -> u32 ---
+
+	// Get the byte offset where the given pattern ends in the query's source.
+	//
+	// This can be useful when combining queries by concatenating their source
+	// code strings.
+	query_end_byte_for_pattern :: proc(self: Query, pattern_index: u32) -> u32 ---
 
 	// Get all of the predicates for the given pattern in the query.
 	//
@@ -799,6 +811,13 @@ foreign ts {
 	/* Section - Language */
 	/**********************/
 
+	// Get another reference to the given language.
+	language_copy :: proc(self: Language) -> Language ---
+
+	// Free any dynamically-allocated resources for this language, if
+	// this is the last reference.
+	language_delete :: proc(self: Language) ---
+
 	// Get the number of distinct node types in the language.
 	language_symbol_count :: proc(self: Language) -> u32 ---
 
@@ -928,8 +947,11 @@ foreign ts {
 	@(link_name="ts_wasm_store_load_language")
 	_wasm_store_load_language :: proc(self: ^Wasm_Store, name: cstring, wasm: cstring, wasm_len: u32, error: ^Wasm_Error) -> Language ---
 
+	// Get the number of languages instantiated in the given wasm store.
+	wasm_store_language_count :: proc(self: ^Wasm_Store) -> uint ---
+
 	// Check if the language came from a Wasm module. If so, then in order to use
-	// this langauge with a Parser, that parser must have a Wasm store assigned.
+	// this language with a Parser, that parser must have a Wasm store assigned.
 	language_is_wasm :: proc(self: Language) -> bool ---
 
 	// Assign the given Wasm store to the parser. A parser must have a Wasm store

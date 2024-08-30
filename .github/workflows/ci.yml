@@ -23,7 +23,7 @@ jobs:
         run: odin report
       - name: Install Tree Sitter and Odin Parser
         run: |
-            odin run build -- install -y
+            odin run build -- install
             odin run build -- install-parser -y https://github.com/amaanq/tree-sitter-odin
       - name: Run Example
         run: |

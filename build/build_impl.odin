@@ -94,6 +94,11 @@ _install :: proc(opts: Install_Opts) -> bool {
 		cp_file("libtree-sitter.lib", filepath.join({lib_dir, "libtree-sitter.lib"}), rm_src=true) or_return
 	} else {
 		cp_file("libtree-sitter.a", filepath.join({lib_dir, "libtree-sitter.a"}), rm_src=true) or_return
+
+		if ODIN_OS == .Darwin && opts.debug {
+			/* dsymutil lib.o $lib_dir/libtree-sitter.dSYM */
+			exec(fmt.ctprintf("dsymutil lib.o -o %q", filepath.join({lib_dir, "libtree-sitter.dSYM"}))) or_return
+		}
 	}
 
 	cp_file("tmp-tree-sitter/LICENSE", filepath.join({lib_dir, "LICENSE"})) or_return
@@ -242,6 +247,17 @@ _install_parser :: proc(opts: Install_Parser_Opts) -> (ok: bool) {
 		cp_file(pp.tmp_parser_path, filepath.join({parser_dir, "parser.lib"}))
 	} else {
 		cp_file(pp.tmp_parser_path, filepath.join({parser_dir, "parser.a"}))
+
+		if ODIN_OS == .Darwin && opts.debug {
+			/* dsymutil parser.o scanner.o -o parser.dSYM */
+			cmd: [dynamic]string
+			append(&cmd, "dsymutil")
+			append(&cmd, ..ar_files[:])
+			append(&cmd, "-o")
+			append(&cmd, filepath.join({parser_dir, "parser.dSYM"}))
+			ccmd := strings.clone_to_cstring(strings.join(cmd[:], " "))
+			exec(ccmd) or_return
+		}
 	}
 
 	has_queries := cp(filepath.join({pp.tmp_dir, opts.path, "queries"}), filepath.join({parser_dir, "queries"}))

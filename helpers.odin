@@ -208,7 +208,7 @@ file_input :: proc(fi: ^File_Input, fh: os.Handle, buf: []byte, encoding: Input_
 			context = fi.ctx
 
 			n, err := os.read_at(fi.fh, fi.buf, i64(off))
-			if err != 0 {
+			if err != nil {
 				log.warnf("read error: %v", err)
 			}
 

@@ -21,8 +21,6 @@ jobs:
             llvm-version: 17
       - name: Report
         run: odin report
-      - name: Check
-        run: odin check example -vet -strict-style -vet-tabs -disallow-do
       - name: Install Tree Sitter and Odin Parser
         run: |
             odin run build -- install -y

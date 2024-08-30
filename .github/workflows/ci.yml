@@ -1,0 +1,32 @@
+name: Run and Check Example
+
+on:
+  push:
+  workflow_dispatch:
+  schedule:
+    - cron: 0 20 * * *
+
+env:
+  FORCE_COLOR: "1"
+
+jobs:
+  example:
+    runs-on: macos-latest
+    steps:
+      - uses: laytan/setup-odin@v2
+        with:
+            token: ${{ secrets.GITHUB_TOKEN }}
+            release: false
+            llvm-version: 18
+      - name: Report
+        run: odin report
+      - name: Check
+        run: odin check example -vet -strict-style -vet-tabs -disallow-do
+      - name: Install Tree Sitter and Odin Parser
+        run: |
+            odin run build -- install -y
+            odin run build -- install-parser -y https://github.com/amaanq/tree-sitter-odin
+      - name: Run Example
+        run: |
+            odin run example -debug -vet -strict-style -disallow-do -vet-tabs
+            odin run example -o:speed

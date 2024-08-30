@@ -12,7 +12,7 @@ import "core:log"
 import "core:mem"
 
 main :: proc() {
-	logger := log.create_console_logger(.Debug, {
+	logger := log.create_console_logger(.Debug when ODIN_DEBUG else .Info, {
 		.Level,
 		.Terminal_Color,
 		.Short_File_Path,

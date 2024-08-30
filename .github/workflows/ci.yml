@@ -13,6 +13,7 @@ jobs:
   example:
     runs-on: macos-latest
     steps:
+      - uses: actions/checkout@v4
       - uses: laytan/setup-odin@v2
         with:
             token: ${{ secrets.GITHUB_TOKEN }}

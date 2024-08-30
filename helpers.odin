@@ -17,9 +17,8 @@ Set the allocator used by tree-sitter to one managed by Odin.
 
 NOTE: `.Resize` in Odin is used for `realloc`, but Odin's allocators rely on having an `old_size`
 passed through. Tree Sitter does not give this to us though.
-The default heap allocator will thus be (probably) the only allocator to work out of the box here.
-If you get segfaults, you can opt to use the `Compat_Allocator` in this package, it will keep the
-allocated sizes in a 2*size_of(rawptr) byte header before each allocation, and passes this along to the actual allocator.
+
+WARN: the allocator you give this must not require `old_size` on resizes. Use the `Compat_Allocator` in this package!
 */
 set_odin_allocator :: proc(allocator := context.allocator) {
 	odin_malloc :: proc "c" (size: uint) -> rawptr {
@@ -42,10 +41,7 @@ set_odin_allocator :: proc(allocator := context.allocator) {
 
 	odin_realloc :: proc "c" (ptr: rawptr, size: uint) -> rawptr {
 		context = alloc_context
-		// `old_size` of `max(int)` prohibits the default allocator from zeroing the region.
-		// Other allocators can be wrapped by the `Compat_Allocator` in this package to keep track
-		// of allocation sizes to pass along.
-		addr, err := runtime.mem_resize(ptr, max(int), int(size))
+		addr, err := runtime.mem_resize(ptr, -1, int(size))
 		if err != nil {
 			fmt.panicf("tree-sitter realloc could not be satisfied: %v", err)
 		}
@@ -67,8 +63,6 @@ set_odin_allocator :: proc(allocator := context.allocator) {
 //
 // You want to wrap your allocator into this one if you are trying to use any allocator that relies
 // on the old size to work.
-// This is most allocators, although the default heap allocator seems to work normally without this
-// wrapping allocator.
 //
 // The overhead of this allocator is an extra 2*size_of(rawptr) bytes allocated for each allocation, these bytes are
 // used to store the size and padding to keep the returned alignment to 2*size_of(rawptr) bytes.

@@ -23,6 +23,14 @@ main :: proc() {
 	track: mem.Tracking_Allocator
 	mem.tracking_allocator_init(&track, context.allocator)
 	defer mem.tracking_allocator_destroy(&track)
+	context.allocator = mem.tracking_allocator(&track)
+
+	la: log.Log_Allocator
+	log.log_allocator_init(&la, .Debug, .Human)
+	context.allocator = log.log_allocator(&la)
+
+	compat: ts.Compat_Allocator
+	ts.compat_allocator_init(&compat)
 
 	defer {
 		for _, leak in track.allocation_map {
@@ -34,7 +42,7 @@ main :: proc() {
 	}
 
 	{
-		ts.set_odin_allocator(mem.tracking_allocator(&track))
+		ts.set_odin_allocator(ts.compat_allocator(&compat))
 
 		parser := ts.parser_new()
 		defer ts.parser_delete(parser)

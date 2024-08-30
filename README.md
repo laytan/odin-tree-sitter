@@ -23,16 +23,15 @@ static library and license in the `tree-sitter` subdirectory.
 Debug symbols, a different repo or branch and more can be configured using flags and options.
 
 ```sh
-odin run build -- install --help
+odin run build -- install -h
 Usage:
-        build install [flags]
+        build install [-branch] [-clean] [-debug] [-minimum-os-version] [-repo]
 Flags:
-        -help,-h               Show this message.
-        -debug,-d              Compile tree-sitter with debug symbols.
-        -minimum-os-version,-m The minimum OS version to target (only used on Darwin, default is 12.0.0).
-        -branch,-b             Branch of the tree-sitter git repo to install, default is "master".
-        -repo,-r               Repo to install, default is "https://github.com/tree-sitter/tree-sitter".
-        -clean,-c              First uninstall
+        -branch:<string>              | Branch of the tree-sitter git repo to install, default is
+        -clean                        | First uninstall.
+        -debug                        | Compile tree-sitter with debug symbols.
+        -minimum-os-version:<string>  | The minimum OS version to target (only used on Darwin, default is 12.0.0).
+        -repo:<string>                | Repo to install, default is 'https://github.com/tree-sitter/tree-sitter'.
 ```
 
 ### Installing and generating bindings for language grammar
@@ -45,17 +44,16 @@ The bindings will contain one procedure in the format `tree_sitter_LANGUAGE_NAME
 `#load` to load in the query files it provides.
 
 ```sh
-odin run build -- install-parser --help
+odin run build -- install-parser -h
 Usage:
-        build install-parser [git-url]
-Example:
-        build install-parser https://github.com/amaanq/tree-sitter-odin
+        build install-parser parser [-clean] [-debug] [-minimum-os-version] [-name] [-path] [-yes]
 Flags:
-        -help,-h               Show this message.
-        -debug,-d              Compile parser with debug symbols.
-        -minimum-os-version,-m The minimum OS version to target (only used on Darwin, default is 12.0.0).
-        -yes,-y                Automatically confirm questions to their defaults (non-interactive) mode.
-        -name,-n               Overwrite the language name.
-        -clean,-c              First uninstall.
-        -path,-p               Subdirectory to compile.
+        -parser:<string>, required    | git URL of the parser to be installed.
+                                      |
+        -clean                        | First uninstall.
+        -debug                        | Compile parser with debug symbols.
+        -minimum-os-version:<string>  | The minimum OS version to target (only used on Darwin, default is 12.0.0).
+        -name:<string>                | Overwrite the language name.
+        -path:<string>                | Subdirectory to compile.
+        -yes                          | Automatically confirm questions to their defaults (non-interactive) mode.
 ```

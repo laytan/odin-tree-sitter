@@ -58,84 +58,9 @@ set_odin_allocator :: proc(allocator := context.allocator) {
 	set_allocator(odin_malloc, odin_calloc, odin_realloc, odin_free)
 }
 
-// An allocator that keeps track of allocation sizes and passes it along to resizes.
-// This is needed because tree-sitter does not pass old size of allocations on reallocs.
-//
-// You want to wrap your allocator into this one if you are trying to use any allocator that relies
-// on the old size to work.
-//
-// The overhead of this allocator is an extra 2*size_of(rawptr) bytes allocated for each allocation, these bytes are
-// used to store the size and padding to keep the returned alignment to 2*size_of(rawptr) bytes.
-Compat_Allocator :: struct {
-	parent: mem.Allocator,
-}
-
-compat_allocator_init :: proc(rra: ^Compat_Allocator, allocator := context.allocator) {
-	rra.parent = allocator
-}
-
-compat_allocator :: proc(rra: ^Compat_Allocator) -> mem.Allocator {
-	return mem.Allocator{
-		data      = rra,
-		procedure = compat_allocator_proc,
-	}
-}
-
-@(private)
-compat_allocator_proc :: proc(allocator_data: rawptr, mode: mem.Allocator_Mode,
-                             size, alignment: int,
-                             old_memory: rawptr, old_size: int,
-                             location := #caller_location) -> (data: []byte, err: mem.Allocator_Error) {
-	size, old_size := size, old_size
-
-	Header :: struct {
-		_padding: [size_of(rawptr)]byte, // We want the structure to be 2*size of ptr bytes so the allocation we return is also aligned to 16 bytes.
-		size:     uintptr,
-	}
-
-	rra := (^Compat_Allocator)(allocator_data)
-	switch mode {
-	case .Alloc, .Alloc_Non_Zeroed:
-		size := size
-		size += size_of(Header)
-
-		data = rra.parent.procedure(rra.parent.data, mode, size, alignment, old_memory, old_size, location) or_return
-
-		header := cast(^Header)(raw_data(data))
-		header.size = uintptr(size)
-
-		data = data[size_of(Header):]
-		return
-
-	case .Free:
-		header := cast(^Header)(uintptr(old_memory)-size_of(Header))
-
-		old_size    = int(header.size)
-		old_memory := header
-
-		return rra.parent.procedure(rra.parent.data, mode, size, alignment, old_memory, old_size, location)
-
-	case .Resize, .Resize_Non_Zeroed:
-		header := cast(^Header)(uintptr(old_memory)-size_of(Header))
-
-		size        = size + size_of(Header)
-		old_size    = int(header.size)
-		old_memory := header
-
-		data = rra.parent.procedure(rra.parent.data, mode, size, alignment, old_memory, old_size, location) or_return
-
-		header = cast(^Header)(raw_data(data))
-		header.size = uintptr(size)
-
-		data = data[size_of(Header):]
-		return
-
-	case .Free_All, .Query_Info, .Query_Features:
-		return rra.parent.procedure(rra.parent.data, mode, size, alignment, old_memory, old_size, location)
-
-	case: unreachable()
-	}
-}
+Compat_Allocator      :: mem.Compat_Allocator
+compat_allocator_init :: mem.compat_allocator_init
+compat_allocator      :: mem.compat_allocator
 
 // NOTE: even though there is nothing printed when the log level is higher, tree-sitter still formats
 // all the log messages, this has huge overhead so you should probably only set this if you actually

@@ -1,10 +1,10 @@
 package ts_build
 
-import "core:fmt"
-import "core:log"
-import "core:os"
-import "core:path/filepath"
-import "core:strings"
+import    "core:fmt"
+import    "core:log"
+import    "core:path/filepath"
+import    "core:strings"
+import os "core:os/os2"
 
 _install :: proc(opts: Install_Opts) -> bool {
 	paths   := paths()
@@ -18,16 +18,12 @@ _install :: proc(opts: Install_Opts) -> bool {
 		}
 	}
 
-	exec(fmt.ctprintf("git clone %s --depth=1 --branch=%s tmp-tree-sitter", opts.repo, opts.branch)) or_return
+	exec("git", "clone", opts.repo, "--depth=1", strings.concatenate({"--branch=", opts.branch}), "tmp-tree-sitter") or_return
 	defer rmrf("tmp-tree-sitter")
-
-	cc := c_compiler().? or_return
-	ar := archiver().? or_return
 
 	/* cc -I/lib/include -I/lib/src -I/lib/src/wasm -O3 -c lib/src/lib.c */
 	{
 		cmd: [dynamic]string
-		append(&cmd, cc)
 
 		include_dir := filepath.join({ "tmp-tree-sitter", "lib", "include" })
 		src_dir     := filepath.join({ "tmp-tree-sitter", "lib", "src" })
@@ -63,29 +59,27 @@ _install :: proc(opts: Install_Opts) -> bool {
 		}
 		append(&cmd, filepath.join({"tmp-tree-sitter", "lib", "src", "lib.c"}))
 
-		ccmd := strings.clone_to_cstring(strings.join(cmd[:], " "))
-		exec(ccmd) or_return
+		compile(&cmd) or_return
 	}
 	defer rm_file("lib.obj" when ODIN_OS == .Windows else "lib.o")
 
 	/* ar cr libtree-sitter.a lib.o */
 	{
 		cmd: [dynamic]string
-		append(&cmd, ar)
 
 		when ODIN_OS == .Windows {
-			append(&cmd, "/OUT:libtree-sitter.lib lib.obj")
+			append(&cmd, "/OUT:libtree-sitter.lib")
+			append(&cmd, "lib.obj")
 		} else {
 			append(&cmd, "cr")
-			append(&cmd, "libtree-sitter.a lib.o")
+			append(&cmd, "libtree-sitter.a")
+			append(&cmd, "lib.o")
 		}
 
-		ccmd := strings.clone_to_cstring(strings.join(cmd[:], " "))
-		exec(ccmd) or_return
+		archive(&cmd) or_return
 	}
 
-	exist_error :: os.ERROR_FILE_EXISTS when ODIN_OS == .Windows else os.EEXIST
-	if errno := os.make_directory(lib_dir); errno != 0 && errno != exist_error {
+	if err := os.make_directory_all(lib_dir); err != nil && err != .Exist {
 		log.errorf("could not make directory %q", lib_dir)
 		return false
 	}
@@ -97,7 +91,7 @@ _install :: proc(opts: Install_Opts) -> bool {
 
 		if ODIN_OS == .Darwin && opts.debug {
 			/* dsymutil lib.o $lib_dir/libtree-sitter.dSYM */
-			exec(fmt.ctprintf("dsymutil lib.o -o %q", filepath.join({lib_dir, "libtree-sitter.dSYM"}))) or_return
+			exec("dsymutil", "lib.o", "-o", filepath.join({lib_dir, "libtree-sitter.dSYM"})) or_return
 		}
 	}
 
@@ -137,16 +131,19 @@ _install_parser :: proc(opts: Install_Parser_Opts) -> (ok: bool) {
 		}
 	}
 
-	cc := c_compiler().? or_return
-	ar := archiver().? or_return
-
-	exec(fmt.ctprintf("git clone --depth=1 %s %s", parser, pp.tmp_dir)) or_return
+	exec("git", "clone", "--depth=1", parser, pp.tmp_dir) or_return
 	defer rmrf(pp.tmp_dir)
 
 	// Section can probably be used by other langs.
 	c_files:  [dynamic]string
 	ar_files: [dynamic]string
-	cwd := os.get_current_directory()
+
+	cwd, err := os.getwd(context.allocator)
+	if err != nil {
+		log.errorf("failed retrieving working directory: %v", os.error_string(err))
+		return false
+	}
+
 	{
 		scanner_path := filepath.join({pp.tmp_dir, opts.path, "src", "scanner.c"})
 		if os.exists(scanner_path) {
@@ -177,7 +174,6 @@ _install_parser :: proc(opts: Install_Parser_Opts) -> (ok: bool) {
 	/* cc -c -I/src src/scanner.c src/parser.c */
 	{
 		cmd: [dynamic]string
-		append(&cmd, cc)
 
 		src_dir := filepath.join({pp.tmp_dir, opts.path, "src"})
 
@@ -205,15 +201,13 @@ _install_parser :: proc(opts: Install_Parser_Opts) -> (ok: bool) {
 		}
 		append(&cmd, ..c_files[:])
 
-		ccmd := strings.clone_to_cstring(strings.join(cmd[:], " "))
-		exec(ccmd) or_return
+		compile(&cmd) or_return
 	}
 	defer { for af in ar_files do rm_file(af) }
 
 	/* ar cr parser.a parser.o scanner.o */
 	{
 		cmd: [dynamic]string
-		append(&cmd, ar)
 
 		when ODIN_OS == .Windows {
 			append(&cmd, fmt.tprintf("/OUT:%s", pp.tmp_parser_path))
@@ -223,12 +217,11 @@ _install_parser :: proc(opts: Install_Parser_Opts) -> (ok: bool) {
 		}
 		append(&cmd, ..ar_files[:])
 
-		ccmd := strings.clone_to_cstring(strings.join(cmd[:], " "))
-		exec(ccmd) or_return
+		archive(&cmd) or_return
 	}
 
-	if err := os.make_directory(parser_dir); err != 0 {
-		log.errorf("could not make directory %q, error code: %i", parser_dir, err)
+	if merr := os.make_directory_all(parser_dir); merr != nil {
+		log.errorf("could not make directory %q: %v", parser_dir, os.error_string(merr))
 		return false
 	}
 	defer { if !ok do rmrf(parser_dir) }
@@ -255,8 +248,7 @@ _install_parser :: proc(opts: Install_Parser_Opts) -> (ok: bool) {
 			append(&cmd, ..ar_files[:])
 			append(&cmd, "-o")
 			append(&cmd, filepath.join({parser_dir, "parser.dSYM"}))
-			ccmd := strings.clone_to_cstring(strings.join(cmd[:], " "))
-			exec(ccmd) or_return
+			exec(..cmd[:]) or_return
 		}
 	}
 
@@ -269,18 +261,17 @@ _install_parser :: proc(opts: Install_Parser_Opts) -> (ok: bool) {
 		queries_dir := filepath.join({parser_dir, "queries"})
 
 		queries_fd, errno := os.open(queries_dir, os.O_RDONLY)
-		if errno != 0 {
-			log.errorf("could not open queries directory %q in parser repo, error number: %v", queries_dir, errno)
+		if errno != nil {
+			log.errorf("could not open queries directory %q in parser repo: %v", queries_dir, os.error_string(errno))
 			return false
 		}
 		defer os.close(queries_fd)
 
-		files, dir_errno := os.read_dir(queries_fd, -1)
-		if dir_errno != 0 {
-			log.errorf("could not read directory contents at %q, error number: %v", queries_dir, dir_errno)
-		}
 
-		for info in files {
+		iter := os.read_directory_iterator_create(queries_fd)
+		defer os.read_directory_iterator_destroy(&iter)
+
+		for info in os.read_directory_iterator(&iter) {
 			if !strings.has_suffix(info.name, ".scm") {
 				return false
 			}
@@ -298,7 +289,10 @@ _install_parser :: proc(opts: Install_Parser_Opts) -> (ok: bool) {
 	}
 
 	bindings_path := filepath.join({parser_dir, strings.concatenate({name, ".odin"})})
-	write_entire_file(bindings_path, buf.buf[:]) or_return
+	if werr := os.write_entire_file(bindings_path, buf.buf[:]); werr != nil {
+		log.errorf("failed writing bindings: %v", os.error_string(werr))
+		return false
+	}
 	log.infof("successfully installed the %v parser", name)
 	return true
 }

@@ -56,11 +56,13 @@ parser_parse_string_encoding :: #force_inline proc(self: Parser, string: string,
 //
 // If parsing takes longer than this, it will halt early, returning NULL.
 // See [`parser_parse`] for more information.
+@(deprecated="use `parser_parse_with_options` and pass in a callback instead, this will be removed in 0.26.")
 parser_set_timeout :: #force_inline proc(self: Parser, timeout: time.Duration) {
 	_parser_set_timeout_micros(self, u64(timeout / time.Microsecond))
 }
 
 // Get the duration that parsing is allowed to take.
+@(deprecated="use `parser_parse_with_options` and pass in a callback instead, this will be removed in 0.26.")
 parser_timeout :: #force_inline proc(self: Parser) -> time.Duration {
 	micros := _parser_timeout_micros(self)
 	return time.Duration(time.Duration(micros) * time.Microsecond)
@@ -216,6 +218,22 @@ language_symbol_for_name :: #force_inline proc(self: Language, string: string, i
 // Get the numerical id for the given field name string.
 language_field_id_for_name :: #force_inline proc(self: Language, name: string) -> Field_Id {
 	return _language_field_id_for_name(self, strings.unsafe_string_to_cstring(name), u32(len(name)))
+}
+
+// Get a list of all supertype symbols for the language.
+language_supertypes :: #force_inline proc(self: Language) -> []Symbol {
+	len: u32
+	supertypes := _language_supertypes(self, &len)
+	return supertypes[:len]
+}
+
+// Get a list of all subtype symbol ids for a given supertype symbol.
+//
+// See `language_supertypes` for fetching all supertype symbols.
+language_subtypes :: #force_inline proc(self: Language, supertype: Symbol) -> []Symbol {
+	len: u32
+	subtypes := _language_subtypes(self, supertype, &len)
+	return subtypes[:len]
 }
 
 // Create a language from a buffer of Wasm. The resulting language behaves

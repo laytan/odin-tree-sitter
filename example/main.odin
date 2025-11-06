@@ -3,7 +3,7 @@ package main
 // Generated through `odin run build -- install`
 import ts ".."
 
-// Generated through `odin run build -- install-parser https://github.com/amaanq/tree-sitter-odin`
+// Generated through `odin run build -- install-parser https://github.com/tree-sitter-grammars/tree-sitter-odin`
 import ts_odin "../parsers/odin"
 
 import "core:fmt"
@@ -52,7 +52,7 @@ main :: proc() {
 		odin_lang := ts_odin.tree_sitter_odin()
 
 		ok := ts.parser_set_language(parser, odin_lang)
-		fmt.assertf(ok, "version mismatch between tree-sitter-odin (%v) and tree-sitter itself", ts.language_version(odin_lang))
+		fmt.assertf(ok, "version mismatch between tree-sitter-odin (%v) and tree-sitter itself (%v-%v)", ts.language_abi_version(odin_lang), ts.MIN_COMPATIBLE_LANGUAGE_VERSION, ts.LANGUAGE_VERSION)
 
 		data, read_ok := os.read_entire_file(#file)
 		fmt.assertf(read_ok, "reading current file at %q failed", #file)

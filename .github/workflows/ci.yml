@@ -13,12 +13,10 @@ jobs:
   example:
     runs-on: macos-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: laytan/setup-odin@v2
         with:
             token: ${{ secrets.GITHUB_TOKEN }}
-            release: false
-            llvm-version: 17
       - name: Report
         run: odin report
       - name: Install Tree Sitter and Odin Parser

@@ -252,7 +252,12 @@ _install_parser :: proc(opts: Install_Parser_Opts) -> (ok: bool) {
 		}
 	}
 
-	has_queries := cp(filepath.join({pp.tmp_dir, opts.path, "queries"}), filepath.join({parser_dir, "queries"}))
+	// Try to find queries - first at {path}/queries, then fallback to root queries/
+	queries_src := filepath.join({pp.tmp_dir, opts.path, "queries"})
+	if !os.exists(queries_src) && opts.path != "" {
+		queries_src = filepath.join({pp.tmp_dir, "queries"})
+	}
+	has_queries := cp(queries_src, filepath.join({parser_dir, "queries"}))
 
 	buf := strings.builder_make()
 	fmt.sbprintf(&buf, BINDINGS, name)

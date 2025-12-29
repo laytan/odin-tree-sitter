@@ -101,7 +101,15 @@ rm_file :: rm
 cp :: proc(src, dst: string, try_it := false, rm_src := false) -> (ok: bool) {
 	log.debugf("cp %q %q", src, dst)
 
-	err := os.copy_directory_all(dst, src)
+	is_dir := os.is_dir(src)
+
+	err: os.Error
+	if is_dir {
+		err = os.copy_directory_all(dst, src)
+	} else {
+		err = os.copy_file(dst, src)
+	}
+
 	if err != nil {
 		if try_it {
 			log.infof("failed copying %q to %q: %v", src, dst, os.error_string(err))
@@ -112,7 +120,7 @@ cp :: proc(src, dst: string, try_it := false, rm_src := false) -> (ok: bool) {
 	}
 
 	if rm_src {
-		if os.is_dir(src) {
+		if is_dir {
 			return rmrf(src)
 		}
 

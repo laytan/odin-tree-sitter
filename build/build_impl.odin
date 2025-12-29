@@ -38,7 +38,7 @@ _install :: proc(opts: Install_Opts) -> bool {
 		ts_wasm_dir    := filepath.join({ src_dir, "lib", "src", "wasm" })
 
 		when ODIN_OS == .Windows {
-			append(&cmd, "/Ox")
+			append(&cmd, "/Od" if opts.unoptimized else "/Ox")
 			append(&cmd, "/EHsc")
 			append(&cmd, "/c")
 
@@ -50,7 +50,7 @@ _install :: proc(opts: Install_Opts) -> bool {
 				append(&cmd, "/Z7")
 			}
 		} else {
-			append(&cmd, "-O3")
+			append(&cmd, "-O0" if opts.unoptimized else "-O3")
 			append(&cmd, "-c")
 
 			append(&cmd, fmt.tprintf("-I%s", ts_include_dir))
@@ -184,7 +184,7 @@ _install_parser :: proc(opts: Install_Parser_Opts) -> (ok: bool) {
 		parser_src_dir := filepath.join({src_dir, opts.path, "src"})
 
 		when ODIN_OS == .Windows {
-			append(&cmd, "/Ox")
+			append(&cmd, "/Od" if opts.unoptimized else "/Ox")
 			append(&cmd, "/EHsc")
 			append(&cmd, "/c")
 			append(&cmd, fmt.tprintf("/I%s", parser_src_dir))
@@ -193,7 +193,7 @@ _install_parser :: proc(opts: Install_Parser_Opts) -> (ok: bool) {
 				append(&cmd, "/Z7")
 			}
 		} else {
-			append(&cmd, "-O3")
+			append(&cmd, "-O0" if opts.unoptimized else "-O3")
 			append(&cmd, fmt.tprintf("-I%s", parser_src_dir))
 			append(&cmd, "-c")
 

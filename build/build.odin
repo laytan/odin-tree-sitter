@@ -58,6 +58,7 @@ main :: proc() {
 
 Install_Opts :: struct {
 	debug:              bool   `usage:"Compile tree-sitter with debug symbols."`,
+	unoptimized:        bool   `usage:"Compile tree-sitter without optimizations."`,
 	minimum_os_version: string `usage:"The minimum OS version to target (only used on Darwin, default is 12.0.0)."`,
 	branch:             string `usage:"Branch of the tree-sitter git repo to install, default is 'v0.26.3'."`,
 	repo:               string `usage:"Repo to install, default is 'https://github.com/tree-sitter/tree-sitter'."`,
@@ -78,6 +79,7 @@ install :: proc(args: []string) -> bool {
 Install_Parser_Opts :: struct {
 	parser:             string `args:"required,pos=0" usage:"git URL of the parser to be installed."`,
 	debug:              bool   `usage:"Compile parser with debug symbols."`,
+	unoptimized:        bool   `usage:"Compile parser without optimizations."`,
 	minimum_os_version: string `usage:"The minimum OS version to target (only used on Darwin, default is 12.0.0)."`,
 	yes:                bool   `usage:"Automatically confirm questions to their defaults (non-interactive) mode."`,
 	name:               string `usage:"Overwrite the language name."`,

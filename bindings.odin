@@ -272,16 +272,7 @@ foreign ts {
 	// are four possible reasons for failure:
 	// 1. The parser does not have a language assigned. Check for this using the
 	//    [`parser_language`] function.
-	// 2. Parsing was cancelled due to a timeout that was set by an earlier call to
-	//    the [`parser_set_timeout`] function. You can resume parsing from
-	//    where the parser left out by calling [`parser_parse`] again with the
-	//    same arguments. Or you can start parsing from scratch by first calling
-	//    [`parser_reset`].
-	// 3. Parsing was cancelled using a cancellation flag that was set by an
-	//    earlier call to [`parser_set_cancellation_flag`]. You can resume parsing
-	//    from where the parser left out by calling [`parser_parse`] again with
-	//    the same arguments.
-	// 4. Parsing was cancelled due to the progress callback return true. This
+	// 2. Parsing was cancelled due to the progress callback return true. This
 	//    callback is passed in `parser_parse_with_options` inside the `Parse_Options`
 	//    struct.
 	//
@@ -314,42 +305,12 @@ foreign ts {
 
 	// Instruct the parser to start the next parse from the beginning.
 	//
-	// If the parser previously failed because of a timeout or a cancellation, then
+	// If the parser previously failed because the progress callback, then
 	// by default, it will resume where it left off on the next call to
 	// [`parser_parse`] or other parsing functions. If you don't want to resume,
 	// and instead intend to use this parser to parse some other document, you must
 	// call [`parser_reset`] first.
 	parser_reset :: proc(self: Parser) ---
-
-	// Deprecated: use `parser_parse_with_options` and pass in a callback instead,
-	// this will be removed in 0.26.
-	//
-	// Set the maximum duration in microseconds that parsing should be allowed to
-	// take before halting.
-	//
-	// If parsing takes longer than this, it will halt early, returning NULL.
-	// See [`ts_parser_parse`] for more information.
-	@(link_name="ts_parser_set_timeout_micros")
-	_parser_set_timeout_micros :: proc(self: Parser, timeout_micros: u64) ---
-
-	// Deprecated: use `parser_parse_with_options` and pass in a callback instead,
-	// this will be removed in 0.26.
-	//
-	// Get the duration in microseconds that parsing is allowed to take.
-	@(link_name="ts_parser_timeout_micros")
-	_parser_timeout_micros :: proc(self: Parser) -> u64 ---
-
-	// Set the parser's current cancellation flag pointer.
-	//
-	// If a non-null pointer is assigned, then the parser will periodically read
-	// from this pointer during parsing. If it reads a non-zero value, it will
-	// halt early, returning NULL. See [`parser_parse`] for more information.
-	@(deprecated="use `parser_parse_with_options` and pass in a callback instead, this will be removed in 0.26.")
-	parser_set_cancellation_flag :: proc(self: Parser, flag: ^uint) ---
-
-	// Get the parser's current cancellation flag pointer.
-	@(deprecated="use `parser_parse_with_options` and pass in a callback instead, this will be removed in 0.26.")
-	parser_cancellation_flag :: proc(self: Parser) -> ^uint ---
 
 	// Set the logger that a parser should use during parsing.
 	//
@@ -589,6 +550,20 @@ foreign ts {
 
 	// Check if two nodes are identical.
 	node_eq :: proc(self, other: Node) -> bool ---
+
+	// Edit a point to keep it in-sync with source code that has been edited.
+	//
+	// This function updates a single point's byte offset and row/column position
+	// based on an edit operation. This is useful for editing points without
+	// requiring a tree or node instance.
+	point_edit :: proc(point: ^Point, point_byte: ^u32, edit: ^Input_Edit) ---
+
+	// Edit a range to keep it in-sync with source code that has been edited.
+	//
+	// This function updates a range's start and end positions based on an edit
+	// operation. This is useful for editing ranges without requiring a tree
+	// or node instance.
+	range_edit :: proc(range: ^Range, edit: ^Input_Edit) ---
 
 	/************************/
 	/* Section - TreeCursor */
@@ -902,6 +877,24 @@ foreign ts {
 	// it will return `true`.
 	query_cursor_set_point_range :: proc(self: Query_Cursor, start_point, end_point: Point) -> bool ---
 
+	// Set the byte range within which all matches must be fully contained.
+	//
+	// Set the range of bytes in which matches will be searched for. In contrast to
+	// `query_cursor_set_byte_range`, this will restrict the query cursor to only return
+	// matches where _all_ nodes are _fully_ contained within the given range. Both functions
+	// can be used together, e.g. to search for any matches that intersect line 5000, as
+	// long as they are fully contained within lines 4500-5500
+	query_cursor_set_containing_byte_range :: proc(self: Query_Cursor, start_byte, end_byte: u32) -> bool ---
+
+	// Set the point range within which all matches must be fully contained.
+	//
+	// Set the range of bytes in which matches will be searched for. In contrast to
+	// `ts_query_cursor_set_point_range`, this will restrict the query cursor to only return
+	// matches where _all_ nodes are _fully_ contained within the given range. Both functions
+	// can be used together, e.g. to search for any matches that intersect line 5000, as
+	// long as they are fully contained within lines 4500-5500
+	query_cursor_set_containing_point_range :: proc(self: Query_Cursor, start_point, end_point: Point) -> bool ---
+
 	// Advance to the next match of the currently running query.
 	//
 	// If there is a match, write it to `*match` and return `true`.
@@ -986,14 +979,6 @@ foreign ts {
 	//
 	// See also [`node_is_named`]. Hidden nodes are never returned from the API.
 	language_symbol_type :: proc(self: Language, symbol: Symbol) -> Symbol_Type ---
-
-	// Get the ABI version number for this language. This version number is used
-	// to ensure that languages were generated by a compatible version of
-	// Tree-sitter.
-	//
-	// See also [`parser_set_language`].
-	@(deprecated="use `language_abi_version` instead, this will be removed in 0.26.")
-	language_version :: proc(self: Language) -> u32 ---
 
 	// Get the ABI version number for this language. This version number is used
 	// to ensure that languages were generated by a compatible version of
@@ -1105,7 +1090,7 @@ foreign ts {
 	@(link_name="ts_wasm_store_load_language")
 	_wasm_store_load_language :: proc(self: ^Wasm_Store, name: cstring, wasm: cstring, wasm_len: u32, error: ^Wasm_Error) -> Language ---
 
-	// Get the number of languages instantiated in the given wasm store.
+	// Get the number of languages instantiated in the given Wasm store.
 	wasm_store_language_count :: proc(self: ^Wasm_Store) -> uint ---
 
 	// Check if the language came from a Wasm module. If so, then in order to use

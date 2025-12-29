@@ -3,7 +3,6 @@ package ts
 // This file contains tiny wrappers/replacements of the C API.
 
 import "core:strings"
-import "core:time"
 import "core:os"
 
 // set the ranges of text that the parser should include when parsing.
@@ -50,22 +49,6 @@ parser_parse_string :: #force_inline proc(self: Parser, string: string, old_tree
 // the text is encoded as UTF8 or UTF16.
 parser_parse_string_encoding :: #force_inline proc(self: Parser, string: string, encoding: Input_Encoding, old_tree: Tree = nil) -> Tree {
 	return _parser_parse_string_encoding(self, old_tree, strings.unsafe_string_to_cstring(string), u32(len(string)), encoding)
-}
-
-// Set the maximum duration that parsing should be allowed to take before halting.
-//
-// If parsing takes longer than this, it will halt early, returning NULL.
-// See [`parser_parse`] for more information.
-@(deprecated="use `parser_parse_with_options` and pass in a callback instead, this will be removed in 0.26.")
-parser_set_timeout :: #force_inline proc(self: Parser, timeout: time.Duration) {
-	_parser_set_timeout_micros(self, u64(timeout / time.Microsecond))
-}
-
-// Get the duration that parsing is allowed to take.
-@(deprecated="use `parser_parse_with_options` and pass in a callback instead, this will be removed in 0.26.")
-parser_timeout :: #force_inline proc(self: Parser) -> time.Duration {
-	micros := _parser_timeout_micros(self)
-	return time.Duration(time.Duration(micros) * time.Microsecond)
 }
 
 // Set the file descriptor to which the parser should write debugging graphs

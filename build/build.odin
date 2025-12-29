@@ -59,14 +59,14 @@ main :: proc() {
 Install_Opts :: struct {
 	debug:              bool   `usage:"Compile tree-sitter with debug symbols."`,
 	minimum_os_version: string `usage:"The minimum OS version to target (only used on Darwin, default is 12.0.0)."`,
-	branch:             string `usage:"Branch of the tree-sitter git repo to install, default is 'v0.25.10'.`,
+	branch:             string `usage:"Branch of the tree-sitter git repo to install, default is 'v0.26.3'."`,
 	repo:               string `usage:"Repo to install, default is 'https://github.com/tree-sitter/tree-sitter'."`,
 	clean:              bool   `usage:"First uninstall."`,
 }
 
 install :: proc(args: []string) -> bool {
 	iopts := Install_Opts{
-		branch             = "v0.25.10",
+		branch             = "v0.26.3",
 		repo               = "https://github.com/tree-sitter/tree-sitter",
 		minimum_os_version = "12.0.0",
 	}

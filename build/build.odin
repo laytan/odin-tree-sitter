@@ -24,7 +24,7 @@ For further details on a command, invoke the command with the -help flag:
 }
 
 main :: proc() {
-	context.logger = log.create_console_logger(.Info, {.Level, .Terminal_Color})
+	context.logger = log.create_console_logger(.Debug when ODIN_DEBUG else .Info, {.Level, .Terminal_Color})
 
 	args := slice.clone_to_dynamic(os.args)
 
@@ -111,39 +111,3 @@ foreign ts_{0:s} {{
 }}
 
 `
-
-Paths :: struct {
-	repo_dir:        string, // root of this project/package.
-	parsers_dir:     string, // root/parsers.
-	tmp_dir:         string, // root/parsers/tmp.
-	tmp_parser_path: string, // root/parsers/tmp/parser.a.
-}
-
-@(private="file")
-_paths: Maybe(Paths)
-
-paths :: proc() -> Paths {
-	if pp, ok := _paths.?; ok {
-		return pp
-	}
-
-	repo_dir        := filepath.dir(filepath.dir(#file))
-	parsers_dir     := filepath.join({repo_dir, "parsers"})
-	tmp_dir         := filepath.join({parsers_dir, "tmp"})
-
-	when ODIN_OS == .Windows {
-		tmp_parser_path := filepath.join({tmp_dir, "parser.lib"})
-	} else {
-		tmp_parser_path := filepath.join({tmp_dir, "parser.a"})
-	}
-
-	pp := Paths{
-		repo_dir        = repo_dir,
-		parsers_dir     = parsers_dir,
-		tmp_dir         = tmp_dir,
-		tmp_parser_path = tmp_parser_path,
-	}
-	
-	_paths = pp
-	return pp
-}

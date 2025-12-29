@@ -25,13 +25,14 @@ Debug symbols, a different repo or branch and more can be configured using flags
 ```sh
 odin run build -- install -h
 Usage:
-        build install [-branch] [-clean] [-debug] [-minimum-os-version] [-repo]
+        build install [-branch] [-clean] [-debug] [-minimum-os-version] [-repo] [-unoptimized]
 Flags:
-        -branch:<string>              | Branch of the tree-sitter git repo to install, default is
+        -branch:<string>              | Branch of the tree-sitter git repo to install, default is 'v0.26.3'.
         -clean                        | First uninstall.
         -debug                        | Compile tree-sitter with debug symbols.
         -minimum-os-version:<string>  | The minimum OS version to target (only used on Darwin, default is 12.0.0).
         -repo:<string>                | Repo to install, default is 'https://github.com/tree-sitter/tree-sitter'.
+        -unoptimized                  | Compile tree-sitter without optimizations.
 ```
 
 ### Installing and generating bindings for language grammar
@@ -46,7 +47,7 @@ The bindings will contain one procedure in the format `tree_sitter_LANGUAGE_NAME
 ```sh
 odin run build -- install-parser -h
 Usage:
-        build install-parser parser [-clean] [-debug] [-minimum-os-version] [-name] [-path] [-yes]
+        build install-parser parser [-clean] [-debug] [-minimum-os-version] [-name] [-path] [-unoptimized] [-yes]
 Flags:
         -parser:<string>, required    | git URL of the parser to be installed.
                                       |
@@ -55,5 +56,6 @@ Flags:
         -minimum-os-version:<string>  | The minimum OS version to target (only used on Darwin, default is 12.0.0).
         -name:<string>                | Overwrite the language name.
         -path:<string>                | Subdirectory to compile.
+        -unoptimized                  | Compile parser without optimizations.
         -yes                          | Automatically confirm questions to their defaults (non-interactive) mode.
 ```

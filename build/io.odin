@@ -32,7 +32,11 @@ exec :: proc(command: ..string) -> bool {
 }
 
 compile :: proc(cmd: ^[dynamic]string) -> (ok: bool) {
-	tries := []string{"", "cc", "cl", "cl.exe", "gcc", "clang"}
+	when ODIN_OS == .Windows {
+		tries := []string{"", "cl.exe", "clang.exe"}
+	} else {
+		tries := []string{"", "cc", "gcc", "clang"}
+	}
 
 	cc, eok := os.lookup_env("CC", context.temp_allocator)
 	if eok { tries[0] = cc }
@@ -52,7 +56,11 @@ compile :: proc(cmd: ^[dynamic]string) -> (ok: bool) {
 }
 
 archive :: proc(cmd: ^[dynamic]string) -> (ok: bool) {
-	tries := []string{"", "ar", "lib", "lib.exe"}
+	when ODIN_OS == .Windows {
+		tries := []string{"", "lib.exe"}
+	} else {
+		tries := []string{"", "ar"}
+	}
 
 	cc, eok := os.lookup_env("AR", context.temp_allocator)
 	if eok { tries[0] = cc }

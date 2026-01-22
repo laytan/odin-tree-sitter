@@ -33,7 +33,7 @@ exec :: proc(command: ..string) -> bool {
 
 compile :: proc(cmd: ^[dynamic]string) -> (ok: bool) {
 	when ODIN_OS == .Windows {
-		tries := []string{"", "cl.exe", "clang.exe"}
+		tries := []string{"", "cl.exe"}
 	} else {
 		tries := []string{"", "cc", "gcc", "clang"}
 	}
@@ -49,7 +49,11 @@ compile :: proc(cmd: ^[dynamic]string) -> (ok: bool) {
 	}
 
 	if !ok {
-		log.errorf("failed to compile C code, tried: %s", strings.join(tries, ", "))
+		when ODIN_OS == .Windows {
+			log.errorf("failed to compile C code due to above errors. Make sure you are running in a developer command prompt / have ran vcvars.")
+		} else {
+			log.errorf("failed to compile C code, tried: %s", strings.join(tries, ", "))
+		}
 	}
 
 	return

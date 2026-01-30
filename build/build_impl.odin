@@ -254,7 +254,7 @@ _install_parser :: proc(opts: Install_Parser_Opts) -> (ok: bool) {
 	has_queries := cp(queries_src, filepath.join({parser_dir, "queries"}))
 
 	buf := strings.builder_make()
-	fmt.sbprintf(&buf, BINDINGS, name)
+	fmt.sbprintf(&buf, BINDINGS, strings.to_snake_case(name))
 
 	if has_queries {
 		queries_dir := filepath.join({parser_dir, "queries"})

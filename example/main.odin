@@ -54,8 +54,8 @@ main :: proc() {
 		ok := ts.parser_set_language(parser, odin_lang)
 		fmt.assertf(ok, "version mismatch between tree-sitter-odin (%v) and tree-sitter itself (%v-%v)", ts.language_abi_version(odin_lang), ts.MIN_COMPATIBLE_LANGUAGE_VERSION, ts.LANGUAGE_VERSION)
 
-		data, read_ok := os.read_entire_file(#file)
-		fmt.assertf(read_ok, "reading current file at %q failed", #file)
+		data, read_err := os.read_entire_file(#file, context.allocator)
+		fmt.assertf(read_err == nil, "reading current file at %q failed: %v", #file, read_err)
 		defer delete(data)
 		source := string(data)
 

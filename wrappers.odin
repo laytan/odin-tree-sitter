@@ -55,8 +55,8 @@ parser_parse_string_encoding :: #force_inline proc(self: Parser, string: string,
 // during parsing. The graphs are formatted in the DOT language. You may want
 // to pipe these graphs directly to a `dot(1)` process in order to generate
 // SVG output. You can turn off this logging by passing a negative `fd`.
-parser_print_dot_graphs :: #force_inline proc(self: Parser, fd: os.Handle) {
-	_parser_print_dot_graphs(self, i32(fd))
+parser_print_dot_graphs :: #force_inline proc(self: Parser, fd: ^os.File) {
+	_parser_print_dot_graphs(self, i32(os.fd(fd)))
 }
 
 // Get the array of included ranges that was used to parse the syntax tree.
@@ -86,8 +86,8 @@ tree_get_changed_ranges :: #force_inline proc(old_tree: Tree, new_tree: Tree) ->
 }
 
 // Write a DOT graph describing the syntax tree to the given file.
-tree_print_dot_graph :: #force_inline proc(self: Tree, fd: os.Handle) {
-	_tree_print_dot_graph(self, i32(fd))
+tree_print_dot_graph :: #force_inline proc(self: Tree, fd: ^os.File) {
+	_tree_print_dot_graph(self, i32(os.fd(fd)))
 }
 
 // Get the node's child with the given field name.

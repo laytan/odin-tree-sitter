@@ -117,12 +117,12 @@ predicates_iter :: proc(preds: ^[]Query_Predicate_Step) -> ([]Query_Predicate_St
 }
 
 File_Input :: struct {
-	fh:  os.Handle,
+	fh:  ^os.File,
 	buf: []byte,
 	ctx: runtime.Context,
 }
 
-file_input :: proc(fi: ^File_Input, fh: os.Handle, buf: []byte, encoding: Input_Encoding = .UTF8) -> Input {
+file_input :: proc(fi: ^File_Input, fh: ^os.File, buf: []byte, encoding: Input_Encoding = .UTF8) -> Input {
 	fi.fh = fh
 	fi.buf = buf
 	fi.ctx = context

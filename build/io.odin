@@ -1,8 +1,8 @@
 package ts_build
 
-import    "core:log"
-import    "core:strings"
-import os "core:os/os2"
+import "core:log"
+import "core:strings"
+import "core:os"
 
 exec :: proc(command: ..string) -> bool {
 	log.info(command)

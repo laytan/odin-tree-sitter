@@ -4,12 +4,11 @@ import "core:flags"
 import "core:fmt"
 import "core:log"
 import "core:os"
-import "core:path/filepath"
 import "core:slice"
 import "core:strings"
 
-print_usage :: proc(fd: os.Handle) {
-	w := os.stream_from_handle(fd)
+print_usage :: proc(fd: ^os.File) {
+	w := os.to_stream(fd)
 	fmt.wprintf(w, `{0:s} is a tool for installing tree-sitter and its language parsers for use in Odin.
 Usage:
 	{0:s} command [arguments]
